@@ -34,6 +34,14 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,ttf}'],
         navigateFallback: 'index.html',
+        // Audio clips are fetched on demand and cached for offline use.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/audio/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'audio', expiration: { maxEntries: 3000, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+          },
+        ],
       },
     }),
   ],

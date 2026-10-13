@@ -109,13 +109,27 @@ npm run build && firebase deploy
 
 The app is a PWA: on Android Chrome it can be installed to the home screen and works offline.
 
-## Making the sounds perfect: record them yourself
+## Audio: studio voice, bundled and offline
 
-Text-to-speech engines cannot say pure phonemes well: "t" tends to come out as "tee" or "tuh". The app uses the best approximations it can, always pairs each sound with its keyword ("/s/ like snake"), but the recommended fix is to record the sounds in your own voice:
+All sounds, letter names, words, sentences and the mascot's lines are pre-generated with **Google Cloud Text-to-Speech** (voice `en-US-Neural2-F`) and shipped in `public/audio/` with a `manifest.json`. The app plays these clips first, on the web and on Android, so speech is consistent, works offline and needs no API key at runtime. Anything not in the manifest (for example a sentence that includes the child's name) falls back to the device's own voice.
 
-Home → **Parents** → **Settings** → **Record the sounds in your own voice**. Each recording stops automatically after 2.5 s, replaces the computer voice for that sound everywhere in the app, and is synced to the cloud when signed in. Tips are shown on screen (say "mmm", not "em"; keep stop sounds short: "t", not "tuh").
+Pure consonant sounds are the hard part: TTS engines cannot say a lone "t". The generator (`scripts/generate-audio.mjs`) synthesizes each consonant inside a syllable from IPA and cuts the vowel off with a band-energy analysis, so you get a hissing "sss", a humming "mmm" and a clipped "t" rather than "tuh".
 
-You can also drop pre-recorded clips into `public/audio/sounds/<id>.mp3` (ids are the `id` fields in `src/content/gpcs.ts`, e.g. `s.mp3`, `sh.mp3`, `oo_long.mp3`); they are used automatically.
+To regenerate (after changing content, or to try another voice):
+
+```bash
+# .env: GOOGLE_TTS_API_KEY=...   (Cloud Text-to-Speech API enabled on your Google Cloud project)
+npm run audio                 # only generates clips that are missing
+npm run audio -- --force      # regenerate everything
+npm run audio -- --only sounds --analyze   # regenerate the 66 sounds and print a frame-by-frame picture of each
+TTS_VOICE=en-US-Neural2-C npm run audio -- --force   # a different voice
+```
+
+The whole curriculum is about 15,000 characters, well inside Google's free monthly tier.
+
+### Or record the sounds yourself
+
+Parents can still record any sound in their own voice: Home → **Parents** → **Settings** → **Record the sounds in your own voice**. Recordings take precedence over the bundled clips, and sync to the cloud when signed in.
 
 ## Parent dashboard
 
@@ -148,7 +162,7 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 ## Known limitations / ideas
 
-- Pure-sound pronunciation depends on the device's TTS voice; recording your own voice (above) is the reliable fix.
+- Dynamic mascot lines (ones that include the child's name) use the device's TTS voice; everything else is bundled studio audio.
 - The app checks answers by tapping, so a parent sitting alongside should listen for the child saying sounds and words out loud.
 - One child profile per parent account. Multiple children could be added by nesting progress under `users/{uid}/children/{childId}`.
 - Group 13 (adjacent consonants) and groups 14–16 (magic e and alternative spellings) are included; a Phase 5 "alternative pronunciations" stage (e.g. `ow` in snow vs cow) is a natural next addition.
