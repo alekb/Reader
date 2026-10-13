@@ -6,7 +6,7 @@ import type { Slot } from '../content/parts'
 import { pickSticker } from '../content/stickers'
 import type { ActivityResult, Progress, SessionLog } from '../engine/types'
 import { applyResult, createProgress, introduce, migrateProgress, xpFor } from '../engine/progress'
-import { advanceGroups, newlyUnlockedParts } from '../engine/curriculum'
+import { advanceGroups, newlyUnlockedPaints, newlyUnlockedParts } from '../engine/curriculum'
 import { bumpStreak, dayKey } from '../engine/scheduler'
 import { mergeProgress, mergeSessions } from '../firebase/sync'
 import { setSfxEnabled } from '../speech/sfx'
@@ -52,6 +52,8 @@ interface ProgressState {
   endSession: (completed: boolean) => SessionSummary | null
   /** Wear a part (null = take the slot off). Only unlocked parts can be worn. */
   equip: (slot: Slot, partId: string | null) => void
+  /** Paint the hat or outfit with an unlocked paint (null = the part's own colour). */
+  setPaint: (target: 'hat' | 'outfit', paintId: string | null) => void
   setCharacter: (base: CharacterBase) => void
   /** Hatch today's surprise egg; returns the sticker id or null if none is available. */
   hatchEgg: () => string | null
@@ -138,7 +140,8 @@ export const useProgress = create<ProgressState>()(
         next.xp += newGroups.length * 50
         const levelBefore = levelFor(progress.xp)
         const unlocked = newlyUnlockedParts(next, now)
-        next.unlockedParts = [...next.unlockedParts, ...unlocked.map((s) => s.id)]
+        const paints = newlyUnlockedPaints(next, now)
+        next.unlockedParts = [...next.unlockedParts, ...unlocked.map((s) => s.id), ...paints]
         const levelAfter = levelFor(next.xp)
         const eggAvailable = completed && next.lastEggDay !== dayKey(now)
         const log: SessionLog = {
@@ -173,6 +176,14 @@ export const useProgress = create<ProgressState>()(
           if (part.base && part.base !== p.character) return
         } else if (slot === 'color') return
         set({ progress: { ...p, look: { ...p.look, [slot]: partId }, updatedAt: Date.now() }, dirty: get().dirty + 1 })
+      },
+
+      setPaint: (target, paintId) => {
+        const p = get().progress
+        if (!p) return
+        if (paintId && !p.unlockedParts.includes(`paint-${paintId}`)) return
+        const key = target === 'hat' ? 'hatPaint' : 'outfitPaint'
+        set({ progress: { ...p, look: { ...p.look, [key]: paintId }, updatedAt: Date.now() }, dirty: get().dirty + 1 })
       },
 
       setCharacter: (base) => {

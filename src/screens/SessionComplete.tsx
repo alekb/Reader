@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GPC_BY_ID, GROUPS } from '../content/gpcs'
-import { LEVEL_NAMES, PART_BY_ID, levelFor } from '../content/parts'
+import { LEVEL_NAMES, PAINT_BY_ID, PART_BY_ID, levelFor } from '../content/parts'
 import { STICKER_BY_ID } from '../content/stickers'
 import { Character } from '../components/Character'
 import { Confetti, Screen } from '../components/ui'
@@ -47,6 +47,7 @@ export function SessionComplete() {
   const level = levelFor(progress.xp)
   const newGroups = summary.completedGroups.map((id) => GROUPS.find((g) => g.id === id)!).filter(Boolean)
   const newParts = summary.unlockedPartIds.map((id) => PART_BY_ID[id]).filter((p) => p && (!p.base || p.base === progress.character))
+  const newPaints = summary.unlockedPartIds.filter((id) => id.startsWith('paint-')).map((id) => PAINT_BY_ID[id.slice(6)]).filter(Boolean)
   const showEgg = summary.eggAvailable && !eggGone
 
   const hatch = () => {
@@ -137,6 +138,18 @@ export function SessionComplete() {
           </button>
         )
       })}
+      {newPaints.length > 0 && (
+        <button onClick={() => nav('/wardrobe')} className="tile w-full flex-col gap-2 p-4">
+          <div className="text-sm font-bold uppercase text-ink/50">New paint unlocked!</div>
+          <div className="flex gap-3">
+            {newPaints.map((pt) => (
+              <span key={pt.id} className="h-12 w-12 rounded-full border-4" style={{ background: pt.fill.startsWith('url') ? 'linear-gradient(135deg,#f43f5e,#fbbf24,#22c55e,#38bdf8,#a855f7)' : pt.fill, borderColor: pt.stroke }} />
+            ))}
+          </div>
+          <div className="text-2xl font-extrabold">{newPaints.map((pt) => pt.name).join(', ')}</div>
+          <div className="text-sm font-bold text-grape">Paint your hat or outfit in Looks</div>
+        </button>
+      )}
       <div className="text-lg font-bold text-ink/60">🔥 {progress.streak.count}-day streak</div>
       <button onClick={() => nav('/')} className="btn btn-primary mt-2 w-full">
         Done ✓

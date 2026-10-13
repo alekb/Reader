@@ -102,11 +102,44 @@ export const PARTS: Part[] = [
 
 export const PART_BY_ID: Record<string, Part> = Object.fromEntries(PARTS.map((p) => [p.id, p]))
 
-/** What the child is wearing: a part id per slot (null = nothing). */
-export type Look = Record<Slot, string | null>
+/** Paint colours for hats and outfits. */
+export interface Paint {
+  id: string
+  name: string
+  fill: string
+  stroke: string
+  unlock: Unlock
+}
+const paint = (id: string, name: string, fill: string, stroke: string, unlock: Unlock): Paint => ({ id, name, fill, stroke, unlock })
+export const PAINTS: Paint[] = [
+  paint('red', 'Red', '#ef4444', '#7f1d1d', { type: 'default' }),
+  paint('blue', 'Blue', '#3b82f6', '#1e3a8a', { type: 'default' }),
+  paint('green', 'Green', '#22c55e', '#14532d', { type: 'default' }),
+  paint('pink', 'Pink', '#ec4899', '#9d174d', { type: 'xp', xp: 60 }),
+  paint('orange', 'Orange', '#f97316', '#7c2d12', { type: 'xp', xp: 150 }),
+  paint('purple', 'Purple', '#8b5cf6', '#4c1d95', { type: 'xp', xp: 220 }),
+  paint('teal', 'Teal', '#14b8a6', '#134e4a', { type: 'xp', xp: 350 }),
+  paint('yellow', 'Yellow', '#facc15', '#854d0e', { type: 'xp', xp: 500 }),
+  paint('black', 'Black', '#1f2937', '#000000', { type: 'xp', xp: 700 }),
+  paint('white', 'White', '#f8fafc', '#475569', { type: 'xp', xp: 900 }),
+  paint('gold', 'Gold', '#fbbf24', '#92400e', { type: 'xp', xp: 1200 }),
+  paint('rainbow', 'Rainbow', 'url(#rq-rainbow)', '#1e1b4b', { type: 'xp', xp: 2000 }),
+]
+export const PAINT_BY_ID: Record<string, Paint> = Object.fromEntries(PAINTS.map((p) => [p.id, p]))
+export function defaultPaintIds(): string[] {
+  return PAINTS.filter((p) => p.unlock.type === 'default').map((p) => `paint-${p.id}`)
+}
+
+/** What the child is wearing: a part id per slot (null = nothing), plus paint for the hat and outfit. */
+export interface Look extends Record<Slot, string | null> {
+  /** Paint id applied to the hat (null = the hat's own colour). */
+  hatPaint?: string | null
+  /** Paint id applied to the outfit. */
+  outfitPaint?: string | null
+}
 
 export function defaultLook(base: CharacterBase): Look {
-  return { color: `color-${base}-classic`, hat: null, face: null, outfit: null, aura: null }
+  return { color: `color-${base}-classic`, hat: null, face: null, outfit: null, aura: null, hatPaint: null, outfitPaint: null }
 }
 
 export function partsForSlot(slot: Slot, base: CharacterBase): Part[] {
@@ -114,7 +147,7 @@ export function partsForSlot(slot: Slot, base: CharacterBase): Part[] {
 }
 
 export function defaultPartIds(): string[] {
-  return PARTS.filter((p) => p.unlock.type === 'default').map((p) => p.id)
+  return [...PARTS.filter((p) => p.unlock.type === 'default').map((p) => p.id), ...defaultPaintIds()]
 }
 
 export function colorOf(look: Look, base: CharacterBase): { body: string; accent: string } {

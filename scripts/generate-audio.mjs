@@ -53,7 +53,7 @@ const { WORDS } = wordsMod
 const { TRICKY_WORDS } = trickyMod
 const { SENTENCES } = sentencesMod
 const { CHARACTERS } = charsMod
-const { PARTS, TRICKS, LEVEL_NAMES } = partsMod
+const { PARTS, PAINTS, TRICKS, LEVEL_NAMES } = partsMod
 const { STICKERS } = stickersMod
 
 /** American English IPA for each GPC, and how to synthesize it. */
@@ -104,6 +104,7 @@ function collectPhrases() {
     set.add(`${c.name}!`)
   }
   for (const p of PARTS) set.add(p.name)
+  for (const p of PAINTS) set.add(p.name)
   for (const t of TRICKS) set.add(t.line)
   for (const st of STICKERS) set.add(`A ${st.name} sticker!`)
   for (let i = 0; i < LEVEL_NAMES.length; i++) set.add(`Level ${i + 1}, ${LEVEL_NAMES[i]}!`)

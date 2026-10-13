@@ -4,8 +4,10 @@ import { Character } from '../components/Character'
 import { Screen, TopBar } from '../components/ui'
 import { CHARACTERS } from '../content/characters'
 import type { CharacterBase } from '../content/characters'
-import { LEVEL_NAMES, SLOTS, SLOT_LABEL, levelProgress, partsForSlot, unlockDescription } from '../content/parts'
+import { LEVEL_NAMES, PAINTS, SLOTS, SLOT_LABEL, levelProgress, partsForSlot, unlockDescription } from '../content/parts'
 import type { Slot } from '../content/parts'
+
+type Tab = Slot | 'paint'
 import { useProgress } from '../store/progressStore'
 import { sfx } from '../speech/sfx'
 import { say } from '../speech/phonics'
@@ -15,11 +17,14 @@ export function Wardrobe() {
   const nav = useNavigate()
   const progress = useProgress((s) => s.progress)!
   const equip = useProgress((s) => s.equip)
+  const setPaint = useProgress((s) => s.setPaint)
   const setCharacter = useProgress((s) => s.setCharacter)
-  const [slot, setSlot] = useState<Slot>('color')
+  const [tab, setTab] = useState<Tab>('color')
   const lp = levelProgress(progress.xp)
+  const slot: Slot = tab === 'paint' ? 'hat' : tab
   const parts = partsForSlot(slot, progress.character)
-  const unlockedCount = parts.filter((p) => progress.unlockedParts.includes(p.id)).length
+  const unlockedCount = tab === 'paint' ? PAINTS.filter((x) => progress.unlockedParts.includes(`paint-${x.id}`)).length : parts.filter((p) => progress.unlockedParts.includes(p.id)).length
+  const total = tab === 'paint' ? PAINTS.length : parts.length
 
   const pick = (base: CharacterBase) => {
     sfx.pop()
@@ -51,17 +56,68 @@ export function Wardrobe() {
       </div>
 
       <div className="flex gap-1 rounded-2xl bg-white p-1 shadow-sm">
-        {SLOTS.map((s) => (
-          <button key={s} onClick={() => setSlot(s)} className={`flex-1 rounded-xl px-1 py-2 text-sm font-extrabold ${slot === s ? 'bg-grape text-white' : 'text-ink/60'}`}>
-            {SLOT_LABEL[s]}
+        {[...SLOTS, 'paint' as const].map((s) => (
+          <button key={s} onClick={() => setTab(s)} className={`flex-1 rounded-xl px-1 py-2 text-xs font-extrabold ${tab === s ? 'bg-grape text-white' : 'text-ink/60'}`}>
+            {s === 'paint' ? 'Paint' : SLOT_LABEL[s]}
           </button>
         ))}
       </div>
       <div className="text-center text-sm font-bold text-ink/50">
-        {unlockedCount} / {parts.length} unlocked
+        {unlockedCount} / {total} unlocked
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      {tab === 'paint' && (
+        <div className="flex flex-col gap-4">
+          {(['hat', 'outfit'] as const).map((target) => {
+            const current = target === 'hat' ? progress.look.hatPaint : progress.look.outfitPaint
+            const has = Boolean(progress.look[target])
+            return (
+              <div key={target} className="rounded-3xl bg-white p-3 shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-sm font-extrabold uppercase text-ink/60">Paint the {target}</div>
+                  {!has && <div className="text-xs font-bold text-ink/40">Put on a {target} first</div>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      sfx.pop()
+                      setPaint(target, null)
+                    }}
+                    className={`flex h-12 w-12 items-center justify-center rounded-full border-4 bg-white text-xl ${current == null ? 'border-grape' : 'border-ink/10'}`}
+                    aria-label="Own colour"
+                  >
+                    ↺
+                  </button>
+                  {PAINTS.map((pt) => {
+                    const unlocked = progress.unlockedParts.includes(`paint-${pt.id}`)
+                    const active = current === pt.id
+                    const bg = pt.fill.startsWith('url') ? 'linear-gradient(135deg,#f43f5e,#fbbf24,#22c55e,#38bdf8,#a855f7)' : pt.fill
+                    return (
+                      <button
+                        key={pt.id}
+                        disabled={!unlocked}
+                        onClick={() => {
+                          sfx.star()
+                          setPaint(target, pt.id)
+                          say(pt.name)
+                        }}
+                        title={unlocked ? pt.name : unlockDescription(pt.unlock)}
+                        className={`relative h-12 w-12 rounded-full border-4 ${active ? 'border-grape scale-110' : 'border-ink/10'} ${unlocked ? '' : 'opacity-40 grayscale'}`}
+                        style={{ background: bg }}
+                      >
+                        {!unlocked && <span className="absolute inset-0 flex items-center justify-center text-base">🔒</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-2 text-xs font-bold text-ink/50">{PAINTS.filter((x) => !progress.unlockedParts.includes(`paint-${x.id}`)).slice(0, 1).map((x) => `Next paint: ${x.name} · ${unlockDescription(x.unlock)}`)}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className={`grid grid-cols-3 gap-3 ${tab === 'paint' ? 'hidden' : ''}`}>
         {slot !== 'color' && (
           <button
             onClick={() => {

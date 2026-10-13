@@ -85,7 +85,11 @@ export function introduce(p: Progress, kind: 'gpc' | 'tricky', id: string, now: 
 export function migrateProgress(raw: unknown): Progress | null {
   if (!raw || typeof raw !== 'object') return null
   const p = raw as Record<string, unknown>
-  if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) return p as unknown as Progress
+  if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) {
+    const cur = p as unknown as Progress
+    const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds()])]
+    return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
+  }
   const base = (['robot', 'dragon', 'monster'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
   const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()))
   const out: Progress = { ...fresh, ...(p as Partial<Progress>), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
