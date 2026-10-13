@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Character } from './Character'
 import type { Mood } from './Character'
+import { levelFor } from '../content/parts'
 import { useProgress } from '../store/progressStore'
 
 export function TopBar({ title, onBack, right, progress }: { title?: string; onBack?: () => void; right?: ReactNode; progress?: number }) {
@@ -31,7 +32,7 @@ export function Mascot({ text, mood = 'idle', size = 120, onTap }: { text?: stri
   if (!progress) return null
   return (
     <div className="flex items-end gap-2" onClick={onTap}>
-      <Character base={progress.character} skinId={progress.skinId} mood={mood} size={size} />
+      <Character base={progress.character} look={progress.look} level={levelFor(progress.xp)} mood={mood} size={size} />
       {text && (
         <div className="relative mb-6 max-w-[60vw] rounded-3xl bg-white px-4 py-3 text-lg font-bold text-ink shadow-md">
           <span className="absolute -left-2 bottom-4 h-4 w-4 rotate-45 bg-white" />

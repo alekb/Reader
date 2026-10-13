@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CharacterBase } from '../content/characters'
-import { defaultSkin } from '../content/characters'
+import { PART_BY_ID, levelFor } from '../content/parts'
+import type { Slot } from '../content/parts'
+import { pickSticker } from '../content/stickers'
 import type { ActivityResult, Progress, SessionLog } from '../engine/types'
-import { applyResult, createProgress, introduce, xpFor } from '../engine/progress'
-import { advanceGroups, newlyUnlockedSkins } from '../engine/curriculum'
-import { bumpStreak } from '../engine/scheduler'
+import { applyResult, createProgress, introduce, migrateProgress, xpFor } from '../engine/progress'
+import { advanceGroups, newlyUnlockedParts } from '../engine/curriculum'
+import { bumpStreak, dayKey } from '../engine/scheduler'
 import { mergeProgress, mergeSessions } from '../firebase/sync'
 import { setSfxEnabled } from '../speech/sfx'
 import { setVoiceRate } from '../speech/tts'
@@ -26,9 +28,13 @@ interface ActiveSession {
 
 export interface SessionSummary {
   log: SessionLog
-  unlockedSkinIds: string[]
+  unlockedPartIds: string[]
   completedGroups: number[]
   accuracy: number
+  /** New level reached this session, if any. */
+  levelUp: number | null
+  /** True when the daily surprise egg is waiting to be hatched. */
+  eggAvailable: boolean
 }
 
 interface ProgressState {
@@ -44,8 +50,11 @@ interface ProgressState {
   recordResult: (r: ActivityResult, stepKind: string) => void
   introduceItem: (kind: 'gpc' | 'tricky', id: string) => void
   endSession: (completed: boolean) => SessionSummary | null
-  setSkin: (skinId: string) => void
+  /** Wear a part (null = take the slot off). Only unlocked parts can be worn. */
+  equip: (slot: Slot, partId: string | null) => void
   setCharacter: (base: CharacterBase) => void
+  /** Hatch today's surprise egg; returns the sticker id or null if none is available. */
+  hatchEgg: () => string | null
   setChildName: (name: string) => void
   setSettings: (s: Partial<Progress['settings']>) => void
   setDailyGoal: (min: number) => void
@@ -127,8 +136,11 @@ export const useProgress = create<ProgressState>()(
         next = advanceGroups(next)
         const newGroups = next.completedGroups.filter((g) => !before.has(g))
         next.xp += newGroups.length * 50
-        const unlocked = newlyUnlockedSkins(next, now)
-        next.unlockedSkins = [...next.unlockedSkins, ...unlocked.map((s) => s.id)]
+        const levelBefore = levelFor(progress.xp)
+        const unlocked = newlyUnlockedParts(next, now)
+        next.unlockedParts = [...next.unlockedParts, ...unlocked.map((s) => s.id)]
+        const levelAfter = levelFor(next.xp)
+        const eggAvailable = completed && next.lastEggDay !== dayKey(now)
         const log: SessionLog = {
           id: active.id,
           startedAt: active.startedAt,
@@ -145,25 +157,42 @@ export const useProgress = create<ProgressState>()(
           completed,
           steps: Object.entries(active.steps).map(([kind, v]) => ({ kind, ...v })),
         }
-        const summary: SessionSummary = { log, unlockedSkinIds: unlocked.map((s) => s.id), completedGroups: newGroups, accuracy }
+        const summary: SessionSummary = { log, unlockedPartIds: unlocked.map((s) => s.id), completedGroups: newGroups, accuracy, levelUp: levelAfter > levelBefore ? levelAfter : null, eggAvailable }
         // Keep the newest 400 sessions locally; the cloud keeps everything.
         const nextSessions = [...sessions, log].slice(-400)
         set({ progress: next, sessions: nextSessions, active: null, lastSummary: summary, dirty: get().dirty + 1 })
         return summary
       },
 
-      setSkin: (skinId) => {
+      equip: (slot, partId) => {
         const p = get().progress
-        if (!p || !p.unlockedSkins.includes(skinId)) return
-        set({ progress: { ...p, skinId, updatedAt: Date.now() }, dirty: get().dirty + 1 })
+        if (!p) return
+        if (partId) {
+          const part = PART_BY_ID[partId]
+          if (!part || part.slot !== slot || !p.unlockedParts.includes(partId)) return
+          if (part.base && part.base !== p.character) return
+        } else if (slot === 'color') return
+        set({ progress: { ...p, look: { ...p.look, [slot]: partId }, updatedAt: Date.now() }, dirty: get().dirty + 1 })
       },
 
       setCharacter: (base) => {
         const p = get().progress
         if (!p) return
-        const skin = p.unlockedSkins.find((id) => id.startsWith(`${base}-`)) ?? defaultSkin(base).id
-        const unlockedSkins = p.unlockedSkins.includes(skin) ? p.unlockedSkins : [...p.unlockedSkins, skin]
-        set({ progress: { ...p, character: base, skinId: skin, unlockedSkins, updatedAt: Date.now() }, dirty: get().dirty + 1 })
+        // Keep the same colour tier if it is unlocked for the new buddy, else classic.
+        const tier = p.look.color?.split('-').pop() ?? 'classic'
+        const wanted = `color-${base}-${tier}`
+        const color = p.unlockedParts.includes(wanted) ? wanted : `color-${base}-classic`
+        set({ progress: { ...p, character: base, look: { ...p.look, color }, updatedAt: Date.now() }, dirty: get().dirty + 1 })
+      },
+
+      hatchEgg: () => {
+        const p = get().progress
+        if (!p) return null
+        const today = dayKey(Date.now())
+        if (p.lastEggDay === today) return null
+        const sticker = pickSticker(p.stickers)
+        set({ progress: { ...p, stickers: [...p.stickers, sticker.id], lastEggDay: today, xp: p.xp + 5, updatedAt: Date.now() }, dirty: get().dirty + 1 })
+        return sticker.id
       },
 
       setChildName: (name) => {
@@ -194,28 +223,22 @@ export const useProgress = create<ProgressState>()(
         set({ progress: merged, sessions: mergeSessions(get().sessions, sessions).slice(-400) })
       },
 
-      replaceAll: (progress, sessions) => set({ progress, sessions: sessions.slice(-400), dirty: get().dirty + 1 }),
+      replaceAll: (progress, sessions) => set({ progress: migrateProgress(progress), sessions: sessions.slice(-400), dirty: get().dirty + 1 }),
     }),
     {
       name: 'reader-quest-progress',
-      version: 1,
+      version: 2,
       partialize: (s) => ({ progress: s.progress, sessions: s.sessions, lastSummary: s.lastSummary }),
+      migrate: (persisted) => {
+        const st = persisted as { progress?: unknown; sessions?: SessionLog[]; lastSummary?: SessionSummary | null }
+        return { ...st, progress: migrateProgress(st.progress), lastSummary: null } as unknown as ProgressState
+      },
       onRehydrateStorage: () => (state) => {
         if (state?.progress) {
-          // Skin ids were renamed when the catalogue grew; map old ids to the new ones.
-          const p = state.progress
-          const rename = (id: string) =>
-            id
-              .replace(/-(lime|fire|slime)$/, '-stars60')
-              .replace(/-(cap|bow)$/, '-island1')
-              .replace(/-glasses$/, '-island2')
-              .replace(/-(headphones|pirate)$/, '-island4')
-              .replace(/-(astro|ice)$/, '-island7')
-              .replace(/-wizard$/, '-island14')
-              .replace(/-(gold|crown)$/, '-words100')
-              .replace(/-streak$/, '-streak7')
-          p.unlockedSkins = [...new Set(p.unlockedSkins.map(rename))]
-          p.skinId = rename(p.skinId)
+          if (state.progress.version !== 2 || !state.progress.look) {
+            const migrated = migrateProgress(state.progress)
+            if (migrated) useProgress.setState({ progress: migrated })
+          }
           setSfxEnabled(state.progress.settings.sfx)
           setVoiceRate(state.progress.settings.voiceRate)
         }

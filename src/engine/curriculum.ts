@@ -4,8 +4,8 @@
  */
 import { GROUPS, GPC_BY_ID, gpcsThroughGroup } from '../content/gpcs'
 import { TRICKY_WORDS } from '../content/trickyWords'
-import { SKINS } from '../content/characters'
-import type { Skin } from '../content/characters'
+import { PARTS } from '../content/parts'
+import type { Part } from '../content/parts'
 import { fragileCount, masteryOf, currentStreak } from './scheduler'
 import type { Progress } from './types'
 
@@ -121,19 +121,27 @@ export function summarize(p: Progress, now: number): Summary {
   }
 }
 
-/** Skins that are now unlocked but not yet in the unlocked list. */
-export function newlyUnlockedSkins(p: Progress, now: number): Skin[] {
+/** Sounds the child knows (secure or mastered). */
+export function soundsKnown(p: Progress): number {
+  return Object.values(p.gpcs).filter((it) => it.box >= 2).length
+}
+
+/** Parts that are now unlocked but not yet in the unlocked list. */
+export function newlyUnlockedParts(p: Progress, now: number): Part[] {
   const streak = currentStreak(p.streak, now)
   const words = Object.keys(p.knownWords).length
-  return SKINS.filter((s) => {
-    if (p.unlockedSkins.includes(s.id)) return false
-    const u = s.unlock
+  const sounds = soundsKnown(p)
+  return PARTS.filter((part) => {
+    if (p.unlockedParts.includes(part.id)) return false
+    const u = part.unlock
     switch (u.type) {
-      case 'default': return false
+      case 'default': return true
       case 'xp': return p.xp >= u.xp
       case 'group': return p.completedGroups.includes(u.group)
       case 'streak': return streak >= u.days
       case 'words': return words >= u.count
+      case 'sessions': return p.sessionsCompleted >= u.count
+      case 'sounds': return sounds >= u.count
     }
   })
 }

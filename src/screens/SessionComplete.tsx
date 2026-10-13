@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GPC_BY_ID, GROUPS } from '../content/gpcs'
-import { SKIN_BY_ID } from '../content/characters'
+import { LEVEL_NAMES, PART_BY_ID, levelFor } from '../content/parts'
+import { STICKER_BY_ID } from '../content/stickers'
 import { Character } from '../components/Character'
 import { Confetti, Screen } from '../components/ui'
 import { useProgress } from '../store/progressStore'
@@ -14,16 +15,25 @@ export function SessionComplete() {
   const nav = useNavigate()
   const summary = useProgress((s) => s.lastSummary)
   const progress = useProgress((s) => s.progress)
-  const setSkin = useProgress((s) => s.setSkin)
+  const equip = useProgress((s) => s.equip)
+  const hatchEgg = useProgress((s) => s.hatchEgg)
+  const [hatched, setHatched] = useState<string | null>(null)
+  const [eggGone, setEggGone] = useState(false)
 
   useEffect(() => {
     stopSpeaking()
-    if (summary?.unlockedSkinIds.length) sfx.unlock()
+    if (summary?.levelUp) sfx.unlock()
+    else if (summary?.unlockedPartIds.length) sfx.unlock()
     else sfx.fanfare()
     const t = setTimeout(() => {
       const name = progress?.childName ?? ''
       say(`Great work, ${name}! You earned ${summary?.log.xpEarned ?? 0} stars.`)
-      if (summary?.unlockedSkinIds.length) say('You unlocked a new look!')
+      if (summary?.levelUp) {
+        say('Level up!')
+        say(`Level ${summary.levelUp}, ${LEVEL_NAMES[summary.levelUp - 1]}!`)
+      }
+      if (summary?.unlockedPartIds.length) say('You unlocked something new!')
+      if (summary?.eggAvailable) say('A surprise egg! Tap it to hatch it.')
     }, 400)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -34,19 +44,58 @@ export function SessionComplete() {
     return null
   }
   const { log } = summary
+  const level = levelFor(progress.xp)
   const newGroups = summary.completedGroups.map((id) => GROUPS.find((g) => g.id === id)!).filter(Boolean)
-  const newSkins = summary.unlockedSkinIds.map((id) => SKIN_BY_ID[id]).filter(Boolean)
+  const newParts = summary.unlockedPartIds.map((id) => PART_BY_ID[id]).filter((p) => p && (!p.base || p.base === progress.character))
+  const showEgg = summary.eggAvailable && !eggGone
+
+  const hatch = () => {
+    const id = hatchEgg()
+    sfx.unlock()
+    setEggGone(true)
+    if (id) {
+      setHatched(id)
+      say(`A ${STICKER_BY_ID[id]?.name ?? 'sticker'} sticker!`)
+    }
+  }
 
   return (
     <Screen className="items-center gap-4 px-4 pb-10 pt-8">
       <Confetti />
-      <Character base={progress.character} skinId={progress.skinId} mood="happy" size={170} />
+      <Character base={progress.character} look={progress.look} level={level} mood="happy" size={170} />
       <h1 className="text-4xl font-extrabold text-grape">Session done!</h1>
       <div className="grid w-full grid-cols-3 gap-3">
         <Stat label="stars" value={`⭐ ${log.xpEarned}`} />
         <Stat label="words read" value={`📖 ${log.wordsRead}`} />
         <Stat label="minutes" value={`⏱️ ${Math.max(1, Math.round(log.durationSec / 60))}`} />
       </div>
+
+      {summary.levelUp && (
+        <div className="w-full rounded-3xl bg-gradient-to-r from-amber-200 to-pink-200 p-4 text-center shadow animate-pop">
+          <div className="text-sm font-bold uppercase text-ink/60">Level up!</div>
+          <div className="text-3xl font-extrabold">
+            Level {summary.levelUp} · {LEVEL_NAMES[summary.levelUp - 1]}
+          </div>
+          <div className="font-bold text-ink/70">Your buddy grew!</div>
+        </div>
+      )}
+
+      {showEgg && (
+        <button onClick={hatch} className="tile w-full flex-col gap-1 bg-gradient-to-b from-sky-100 to-white p-4">
+          <div className="text-sm font-bold uppercase text-ink/50">Surprise egg</div>
+          <div className="animate-egg text-7xl">🥚</div>
+          <div className="text-lg font-extrabold text-grape">Tap to hatch!</div>
+        </button>
+      )}
+      {hatched && (
+        <button onClick={() => nav('/stickers')} className="tile w-full flex-col gap-1 p-4">
+          <div className="text-sm font-bold uppercase text-ink/50">New sticker!</div>
+          <div className="animate-hatch text-7xl">{STICKER_BY_ID[hatched]?.emoji}</div>
+          <div className="text-2xl font-extrabold">{STICKER_BY_ID[hatched]?.name}</div>
+          <div className="text-xs font-bold text-grape">{progress.stickers.length} in your sticker book</div>
+        </button>
+      )}
+
       {log.newGpcs.length > 0 && (
         <div className="w-full rounded-3xl bg-white p-4 text-center shadow">
           <div className="text-sm font-bold uppercase text-ink/50">New sound</div>
@@ -67,14 +116,27 @@ export function SessionComplete() {
           <div className="font-bold text-ink/70">+50 ⭐ bonus</div>
         </div>
       ))}
-      {newSkins.map((s) => (
-        <button key={s.id} onClick={() => setSkin(s.id)} className="tile w-full flex-col gap-1 p-4">
-          <div className="text-sm font-bold uppercase text-ink/50">New look unlocked!</div>
-          <Character base={s.base} skinId={s.id} mood="happy" size={110} />
-          <div className="text-2xl font-extrabold">{s.name}</div>
-          <div className="text-sm font-bold text-grape">{progress.skinId === s.id ? 'Wearing it!' : 'Tap to wear it'}</div>
-        </button>
-      ))}
+      {newParts.map((p) => {
+        const wearing = progress.look[p.slot] === p.id
+        const preview = { ...progress.look, [p.slot]: p.id }
+        return (
+          <button
+            key={p.id}
+            onClick={() => {
+              sfx.star()
+              equip(p.slot, p.id)
+            }}
+            className={`tile w-full flex-col gap-1 p-4 ${wearing ? 'ring-4 ring-grape bg-sun' : ''}`}
+          >
+            <div className="text-sm font-bold uppercase text-ink/50">New {p.slot} unlocked!</div>
+            <Character base={progress.character} look={preview} level={level} mood="happy" size={110} />
+            <div className="text-2xl font-extrabold">
+              {p.icon} {p.name}
+            </div>
+            <div className="text-sm font-bold text-grape">{wearing ? 'Wearing it!' : 'Tap to wear it'}</div>
+          </button>
+        )
+      })}
       <div className="text-lg font-bold text-ink/60">🔥 {progress.streak.count}-day streak</div>
       <button onClick={() => nav('/')} className="btn btn-primary mt-2 w-full">
         Done ✓

@@ -43,6 +43,8 @@ const wordsMod = await server.ssrLoadModule('/src/content/words.ts')
 const trickyMod = await server.ssrLoadModule('/src/content/trickyWords.ts')
 const sentencesMod = await server.ssrLoadModule('/src/content/sentences.ts')
 const charsMod = await server.ssrLoadModule('/src/content/characters.ts')
+const partsMod = await server.ssrLoadModule('/src/content/parts.ts')
+const stickersMod = await server.ssrLoadModule('/src/content/stickers.ts')
 const lessonMod = await server.ssrLoadModule('/src/engine/lessonBuilder.ts')
 await server.close()
 
@@ -50,7 +52,9 @@ const { GPCS, ALPHABET } = gpcsMod
 const { WORDS } = wordsMod
 const { TRICKY_WORDS } = trickyMod
 const { SENTENCES } = sentencesMod
-const { CHARACTERS, SKINS } = charsMod
+const { CHARACTERS } = charsMod
+const { PARTS, TRICKS, LEVEL_NAMES } = partsMod
+const { STICKERS } = stickersMod
 
 /** American English IPA for each GPC, and how to synthesize it. */
 const IPA = {
@@ -99,7 +103,11 @@ function collectPhrases() {
     set.add(`I'm ${c.name}! ${c.tagline}`)
     set.add(`${c.name}!`)
   }
-  for (const s of SKINS) set.add(s.name)
+  for (const p of PARTS) set.add(p.name)
+  for (const t of TRICKS) set.add(t.line)
+  for (const st of STICKERS) set.add(`A ${st.name} sticker!`)
+  for (let i = 0; i < LEVEL_NAMES.length; i++) set.add(`Level ${i + 1}, ${LEVEL_NAMES[i]}!`)
+  for (const p of ['Level up!', 'You unlocked something new!', 'A surprise egg! Tap it to hatch it.']) set.add(p)
   for (const g of GPCS) set.add(`like ${g.keyword}.`)
   for (const g of GPCS) set.add(`like ${g.keyword}`)
   for (const t of TRICKY_WORDS) set.add(t.example)

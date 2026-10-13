@@ -30,7 +30,11 @@ Rules the engine follows (from `docs/RESEARCH.md` §10):
 - **New material only when ready**: at most one new sound per session (two in the first two sessions), none if the review sweep is below 85% or the last session was below 70%, every 4th session is review-only.
 - **Error script**: wrong answer → the app models the right answer, says it with the child, then asks again ("your turn").
 - **Mastery**: an item is "mastered" after 3 correct scheduled reviews on 3 different days.
-- **Rewards never depend on accuracy**: stars come from effort; skins unlock for stars, islands finished, streaks and words read.
+- **Rewards never depend on accuracy**: stars come from effort. Rewards are layered so something new happens almost every session:
+  - **Mix-and-match parts** (36 per buddy): body colour, hat, face, outfit and aura are separate unlocks tied to stars, islands, streaks, words read, sessions and sounds mastered.
+  - **Character levels**: the buddy itself grows at 100, 300, 700 and 1500 stars (antennas, wings, horns, jet boots, fire, auras).
+  - **Surprise egg**: the first finished session each day hatches a sticker for the 60-sticker book.
+  - **Tricks**: tapping the buddy on the home screen plays a trick; new tricks unlock as sounds become secure.
 
 ## Quick start (web)
 

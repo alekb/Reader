@@ -8,6 +8,7 @@ import { Lesson } from './screens/Lesson'
 import { Onboarding } from './screens/Onboarding'
 import { ParentGate } from './screens/ParentGate'
 import { SessionComplete } from './screens/SessionComplete'
+import { Stickers } from './screens/Stickers'
 import { Wardrobe } from './screens/Wardrobe'
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/play" element={<Lesson />} />
             <Route path="/done" element={<SessionComplete />} />
             <Route path="/wardrobe" element={<Wardrobe />} />
+            <Route path="/stickers" element={<Stickers />} />
             <Route path="/alphabet" element={<Alphabet />} />
             <Route path="/parent" element={<ParentGate />} />
             <Route path="/parent/dashboard" element={<Dashboard />} />
