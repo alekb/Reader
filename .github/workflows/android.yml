@@ -1,4 +1,4 @@
-name: Android APK
+name: Android APK and web build
 
 # Builds a debug APK on GitHub's runners (which have the Android SDK) on every
 # push, and uploads it as a workflow artifact: Actions tab → run → Artifacts.
@@ -36,6 +36,11 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      - name: Upload web build (drop the folder on app.netlify.com/drop or deploy with firebase)
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-quest-web
+          path: dist
       - run: npx cap sync android
       - name: Build debug APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon

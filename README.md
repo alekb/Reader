@@ -83,7 +83,20 @@ Change the app id / name in `capacitor.config.ts` before publishing.
 
 ## Deploying the web version
 
-**GitHub Pages (free, one click):** Settings → Pages → Source: **GitHub Actions**. The "Deploy web app to GitHub Pages" workflow then publishes every push to `main` at `https://<user>.github.io/<repo>/` (add the Firebase secrets as above for cloud sync).
+**Fastest (no account needed):** download the `reader-quest-web` artifact from the latest Actions run, unzip it, and drag the folder onto <https://app.netlify.com/drop>. You get a public URL in seconds.
+
+**Firebase Hosting (free, works with a private repo, same project as cloud sync):**
+
+```bash
+npm i -g firebase-tools
+firebase login
+npm run build
+firebase deploy --only hosting --project <your-firebase-project-id>
+```
+
+`firebase.json` is already set up (serves `dist/`, single-page rewrite, cache headers). The app is then at `https://<project-id>.web.app`.
+
+**GitHub Pages:** free only for public repos. Make the repo public (Settings → General → Danger Zone → Change visibility), then Settings → Pages → Source: **GitHub Actions** and re-run the "Deploy web app to GitHub Pages" workflow. It publishes at `https://<user>.github.io/<repo>/`.
 
 `dist/` is a static site. Any static host works (Firebase Hosting, Netlify, Vercel, GitHub Pages). For Firebase Hosting:
 
