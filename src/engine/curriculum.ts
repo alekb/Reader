@@ -4,8 +4,8 @@
  */
 import { GROUPS, GPC_BY_ID, gpcsThroughGroup } from '../content/gpcs'
 import { TRICKY_WORDS } from '../content/trickyWords'
-import { PAINTS, PARTS } from '../content/parts'
-import type { Part, Unlock } from '../content/parts'
+import { UNLOCKABLES } from '../content/parts'
+import type { Unlock } from '../content/parts'
 import { fragileCount, masteryOf, currentStreak } from './scheduler'
 import type { Progress } from './types'
 
@@ -126,29 +126,31 @@ export function soundsKnown(p: Progress): number {
   return Object.values(p.gpcs).filter((it) => it.box >= 2).length
 }
 
-/** True when the unlock rule is satisfied by this progress. */
-export function unlockMet(u: Unlock, p: Progress, now: number): boolean {
+/** Facts the unlock rules depend on, computed once per check. */
+interface UnlockFacts {
+  streak: number
+  words: number
+  sounds: number
+}
+
+function unlockMet(u: Unlock, p: Progress, f: UnlockFacts): boolean {
   switch (u.type) {
     case 'default': return true
     case 'xp': return p.xp >= u.xp
     case 'group': return p.completedGroups.includes(u.group)
-    case 'streak': return currentStreak(p.streak, now) >= u.days
-    case 'words': return Object.keys(p.knownWords).length >= u.count
+    case 'streak': return f.streak >= u.days
+    case 'words': return f.words >= u.count
     case 'sessions': return p.sessionsCompleted >= u.count
-    case 'sounds': return soundsKnown(p) >= u.count
+    case 'sounds': return f.sounds >= u.count
   }
 }
 
-/** Parts that are now unlocked but not yet in the unlocked list. */
-export function newlyUnlockedParts(p: Progress, now: number): Part[] {
-  return PARTS.filter((part) => !p.unlockedParts.includes(part.id) && unlockMet(part.unlock, p, now))
+/** Ids of parts and paints that are now unlocked but not yet in the unlocked list. */
+export function newlyUnlockedIds(p: Progress, now: number): string[] {
+  const facts: UnlockFacts = { streak: currentStreak(p.streak, now), words: Object.keys(p.knownWords).length, sounds: soundsKnown(p) }
+  const have = new Set(p.unlockedParts)
+  return UNLOCKABLES.filter((x) => !have.has(x.id) && unlockMet(x.unlock, p, facts)).map((x) => x.id)
 }
-
-/** Paint ids ("paint-red") newly unlocked. */
-export function newlyUnlockedPaints(p: Progress, now: number): string[] {
-  return PAINTS.map((x) => `paint-${x.id}`).filter((id) => !p.unlockedParts.includes(id) && unlockMet(PAINT_UNLOCK[id], p, now))
-}
-const PAINT_UNLOCK: Record<string, Unlock> = Object.fromEntries(PAINTS.map((x) => [`paint-${x.id}`, x.unlock]))
 
 /** Convenience: all GPC ids taught through the child's current group (for content filtering). */
 export function taughtThroughCurrent(p: Progress): string[] {

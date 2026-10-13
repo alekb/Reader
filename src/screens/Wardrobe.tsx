@@ -6,11 +6,11 @@ import { CHARACTERS } from '../content/characters'
 import type { CharacterBase } from '../content/characters'
 import { LEVEL_NAMES, PAINTS, SLOTS, SLOT_LABEL, levelProgress, partsForSlot, unlockDescription } from '../content/parts'
 import type { Slot } from '../content/parts'
-
-type Tab = Slot | 'paint'
 import { useProgress } from '../store/progressStore'
 import { sfx } from '../speech/sfx'
 import { say } from '../speech/phonics'
+
+type Tab = Slot | 'paint'
 
 /** Mix-and-match wardrobe: one tab per slot, tap a part to wear it. */
 export function Wardrobe() {
@@ -21,10 +21,12 @@ export function Wardrobe() {
   const setCharacter = useProgress((s) => s.setCharacter)
   const [tab, setTab] = useState<Tab>('color')
   const lp = levelProgress(progress.xp)
-  const slot: Slot = tab === 'paint' ? 'hat' : tab
-  const parts = partsForSlot(slot, progress.character)
-  const unlockedCount = tab === 'paint' ? PAINTS.filter((x) => progress.unlockedParts.includes(`paint-${x.id}`)).length : parts.filter((p) => progress.unlockedParts.includes(p.id)).length
-  const total = tab === 'paint' ? PAINTS.length : parts.length
+  const slot: Slot | null = tab === 'paint' ? null : tab
+  const parts = slot ? partsForSlot(slot, progress.character) : []
+  const has = (id: string) => progress.unlockedParts.includes(id)
+  const unlockedCount = slot ? parts.filter((p) => has(p.id)).length : PAINTS.filter((x) => has(x.id)).length
+  const total = slot ? parts.length : PAINTS.length
+  const nextPaint = PAINTS.find((x) => !has(x.id))
 
   const pick = (base: CharacterBase) => {
     sfx.pop()
@@ -68,14 +70,19 @@ export function Wardrobe() {
 
       {tab === 'paint' && (
         <div className="flex flex-col gap-4">
+          {nextPaint && (
+            <div className="text-center text-xs font-bold text-ink/50">
+              Next paint: {nextPaint.name} · {unlockDescription(nextPaint.unlock)}
+            </div>
+          )}
           {(['hat', 'outfit'] as const).map((target) => {
             const current = target === 'hat' ? progress.look.hatPaint : progress.look.outfitPaint
-            const has = Boolean(progress.look[target])
+            const wearing = Boolean(progress.look[target])
             return (
               <div key={target} className="rounded-3xl bg-white p-3 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="text-sm font-extrabold uppercase text-ink/60">Paint the {target}</div>
-                  {!has && <div className="text-xs font-bold text-ink/40">Put on a {target} first</div>}
+                  {!wearing && <div className="text-xs font-bold text-ink/40">Put on a {target} first</div>}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -89,7 +96,7 @@ export function Wardrobe() {
                     ↺
                   </button>
                   {PAINTS.map((pt) => {
-                    const unlocked = progress.unlockedParts.includes(`paint-${pt.id}`)
+                    const unlocked = has(pt.id)
                     const active = current === pt.id
                     const bg = pt.fill.startsWith('url') ? 'linear-gradient(135deg,#f43f5e,#fbbf24,#22c55e,#38bdf8,#a855f7)' : pt.fill
                     return (
@@ -110,14 +117,14 @@ export function Wardrobe() {
                     )
                   })}
                 </div>
-                <div className="mt-2 text-xs font-bold text-ink/50">{PAINTS.filter((x) => !progress.unlockedParts.includes(`paint-${x.id}`)).slice(0, 1).map((x) => `Next paint: ${x.name} · ${unlockDescription(x.unlock)}`)}</div>
               </div>
             )
           })}
         </div>
       )}
 
-      <div className={`grid grid-cols-3 gap-3 ${tab === 'paint' ? 'hidden' : ''}`}>
+      {slot && (
+      <div className="grid grid-cols-3 gap-3">
         {slot !== 'color' && (
           <button
             onClick={() => {
@@ -157,6 +164,7 @@ export function Wardrobe() {
           )
         })}
       </div>
+      )}
     </Screen>
   )
 }

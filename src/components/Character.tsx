@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { CharacterBase } from '../content/characters'
 import { PAINT_BY_ID, colorOf, defaultLook, kindOf } from '../content/parts'
-import type { Look } from '../content/parts'
+import type { Look, Paint } from '../content/parts'
 
 export type Mood = 'idle' | 'happy' | 'thinking' | 'sad' | 'talking'
 
@@ -44,16 +44,18 @@ export function Character({ base, look, level = 1, mood = 'idle', size = 160, cl
   const outfit = kindOf(lk.outfit)
   const aura = kindOf(lk.aura)
   const geo = GEO[base]
-  const hatPaint = (lk.hatPaint && PAINT_BY_ID[lk.hatPaint]) || null
-  const outfitPaint = (lk.outfitPaint && PAINT_BY_ID[lk.outfitPaint]) || null
-  const ctx: Ctx = { base, body: colors.body, accent: colors.accent, level, mood, blink, geo, hatFill: hatPaint?.fill, hatStroke: hatPaint?.stroke, outfitFill: outfitPaint?.fill, outfitStroke: outfitPaint?.stroke }
-  const needsRainbow = hatPaint?.id === 'rainbow' || outfitPaint?.id === 'rainbow'
+  const gradientId = `rq-rainbow-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
+  const withGradient = (p: Paint | undefined): Paint | undefined => (p && p.fill.startsWith('url(') ? { ...p, fill: `url(#${gradientId})` } : p)
+  const hatPaint = withGradient((lk.hatPaint && PAINT_BY_ID[lk.hatPaint]) || undefined)
+  const outfitPaint = withGradient((lk.outfitPaint && PAINT_BY_ID[lk.outfitPaint]) || undefined)
+  const ctx: Ctx = { base, body: colors.body, accent: colors.accent, level, mood, blink, geo, hatPaint, outfitPaint }
+  const needsRainbow = Boolean((hatPaint ?? outfitPaint) && [hatPaint, outfitPaint].some((p) => p?.id === 'paint-rainbow'))
 
   return (
     <svg viewBox="0 0 200 200" width={size} height={size} className={`${anim} ${className}`} role="img" aria-label={`${base} buddy`} style={{ overflow: 'visible' }}>
       {needsRainbow && (
         <defs>
-          <linearGradient id="rq-rainbow" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#f43f5e" />
             <stop offset="0.25" stopColor="#fbbf24" />
             <stop offset="0.5" stopColor="#22c55e" />
@@ -98,10 +100,13 @@ interface Ctx {
   blink: boolean
   geo: Geo
   /** Paint overrides for the hat and the outfit (undefined = the part's own colours). */
-  hatFill?: string
-  hatStroke?: string
-  outfitFill?: string
-  outfitStroke?: string
+  hatPaint?: Paint
+  outfitPaint?: Paint
+}
+
+/** Fill/stroke helpers: the paint's colour if painted, otherwise the part's own. */
+function painter(p: Paint | undefined) {
+  return { f: (own: string) => p?.fill ?? own, s: (own: string) => p?.stroke ?? own }
 }
 
 // ---------------------------------------------------------------- faces (eyes, mouth)
@@ -310,8 +315,7 @@ function Monster({ ctx }: { ctx: Ctx }) {
 // ---------------------------------------------------------------- hats
 function Hat({ kind, ctx }: { kind: string; ctx: Ctx }) {
   const { top } = ctx.geo
-  const f = (own: string) => ctx.hatFill ?? own
-  const s = (own: string) => ctx.hatStroke ?? own
+  const { f, s } = painter(ctx.hatPaint)
   switch (kind) {
     case 'crown':
       return (
@@ -327,7 +331,7 @@ function Hat({ kind, ctx }: { kind: string; ctx: Ctx }) {
         <g>
           <path d={`M58 ${top + 2} a 42 34 0 0 1 84 0 z`} fill={f('#ef4444')} stroke={s('#7f1d1d')} strokeWidth={3} />
           <rect x={92} y={top - 36} width={16} height={14} rx={4} fill={f('#ef4444')} stroke={s('#7f1d1d')} strokeWidth={3} />
-          <path d={`M100 ${top + 2} h 60 a 8 8 0 0 1 0 12 h -60 z`} fill={ctx.hatStroke ?? '#b91c1c'} stroke={s('#7f1d1d')} strokeWidth={3} />
+          <path d={`M100 ${top + 2} h 60 a 8 8 0 0 1 0 12 h -60 z`} fill={ctx.hatPaint ? s('#b91c1c') : '#b91c1c'} stroke={s('#7f1d1d')} strokeWidth={3} />
         </g>
       )
     case 'wizard':
@@ -358,7 +362,7 @@ function Hat({ kind, ctx }: { kind: string; ctx: Ctx }) {
     case 'astro':
       return (
         <g>
-          <ellipse cx={100} cy={ctx.geo.eyeY + 6} rx={64} ry={58} fill="rgba(191,219,254,0.35)" stroke="#e5e7eb" strokeWidth={5} />
+          <ellipse cx={100} cy={ctx.geo.eyeY + 6} rx={64} ry={58} fill={ctx.hatPaint ? f('') : 'rgba(191,219,254,0.35)'} fillOpacity={ctx.hatPaint ? 0.3 : 1} stroke={s('#e5e7eb')} strokeWidth={5} />
           <path d={`M46 ${ctx.geo.eyeY + 20} a 54 48 0 0 1 20 -54`} fill="none" stroke="white" strokeWidth={4} strokeLinecap="round" opacity={0.8} />
         </g>
       )
@@ -392,8 +396,8 @@ function Hat({ kind, ctx }: { kind: string; ctx: Ctx }) {
     case 'halo':
       return (
         <g className="aura-float">
-          <ellipse cx={100} cy={top - 18} rx={34} ry={9} fill="none" stroke="#fde047" strokeWidth={7} />
-          <ellipse cx={100} cy={top - 18} rx={34} ry={9} fill="none" stroke="#facc15" strokeWidth={3} />
+          <ellipse cx={100} cy={top - 18} rx={34} ry={9} fill="none" stroke={f('#fde047')} strokeWidth={7} />
+          <ellipse cx={100} cy={top - 18} rx={34} ry={9} fill="none" stroke={s('#facc15')} strokeWidth={3} />
         </g>
       )
     default:
@@ -467,8 +471,7 @@ function star(cx: number, cy: number, r: number): string {
 
 // ---------------------------------------------------------------- outfits
 function OutfitBack({ kind, ctx }: { kind: string; ctx: Ctx }) {
-  const f = (own: string) => ctx.outfitFill ?? own
-  const s = (own: string) => ctx.outfitStroke ?? own
+  const { f, s } = painter(ctx.outfitPaint)
   switch (kind) {
     case 'cape':
       return (
@@ -489,8 +492,8 @@ function OutfitBack({ kind, ctx }: { kind: string; ctx: Ctx }) {
     case 'wings':
       return (
         <g className="aura-float" opacity={0.9}>
-          <path d="M62 120 q -50 -50 -40 -4 q -4 40 40 24 z" fill="rgba(165,243,252,0.8)" stroke="#06b6d4" strokeWidth={3} strokeLinejoin="round" />
-          <path d="M138 120 q 50 -50 40 -4 q 4 40 -40 24 z" fill="rgba(165,243,252,0.8)" stroke="#06b6d4" strokeWidth={3} strokeLinejoin="round" />
+          <path d="M62 120 q -50 -50 -40 -4 q -4 40 40 24 z" fill={f('rgba(165,243,252,0.8)')} fillOpacity={ctx.outfitPaint ? 0.7 : 1} stroke={s('#06b6d4')} strokeWidth={3} strokeLinejoin="round" />
+          <path d="M138 120 q 50 -50 40 -4 q 4 40 -40 24 z" fill={f('rgba(165,243,252,0.8)')} fillOpacity={ctx.outfitPaint ? 0.7 : 1} stroke={s('#06b6d4')} strokeWidth={3} strokeLinejoin="round" />
         </g>
       )
     default:
@@ -500,8 +503,7 @@ function OutfitBack({ kind, ctx }: { kind: string; ctx: Ctx }) {
 
 function OutfitFront({ kind, ctx }: { kind: string; ctx: Ctx }) {
   const { neck } = ctx.geo
-  const f = (own: string) => ctx.outfitFill ?? own
-  const s = (own: string) => ctx.outfitStroke ?? own
+  const { f, s } = painter(ctx.outfitPaint)
   switch (kind) {
     case 'scarf':
       return (
@@ -521,8 +523,8 @@ function OutfitFront({ kind, ctx }: { kind: string; ctx: Ctx }) {
     case 'badge':
       return (
         <g transform={`translate(128 ${neck + 14})`}>
-          <path d={star(0, 0, 14)} fill="#fbbf24" stroke="#92400e" strokeWidth={2} strokeLinejoin="round" />
-          <text x={-6} y={5} fontSize={12} fontWeight={800} fill="#92400e">A</text>
+          <path d={star(0, 0, 14)} fill={f('#fbbf24')} stroke={s('#92400e')} strokeWidth={2} strokeLinejoin="round" />
+          <text x={-6} y={5} fontSize={12} fontWeight={800} fill={s('#92400e')}>A</text>
         </g>
       )
     case 'medal':

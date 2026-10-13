@@ -67,7 +67,7 @@ for (const [base, look, lvl] of combos) html3 += card(svg(base, look, lvl, 'happ
 html3 += '</div>'
 
 fs.mkdirSync('e2e/shots', { recursive: true })
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH })
+const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {})
 const page = await browser.newPage({ viewport: { width: 1100, height: 900 }, deviceScaleFactor: 1.5 })
 for (const [name, html] of [['gallery-parts', html1], ['gallery-levels', html2], ['gallery-looks', html3]]) {
   await page.setContent(`<!doctype html><html><head><link rel="stylesheet" href="file://${process.cwd()}/public/fonts/fonts.css"></head><body>${html}</body></html>`)

@@ -110,7 +110,7 @@ export interface Paint {
   stroke: string
   unlock: Unlock
 }
-const paint = (id: string, name: string, fill: string, stroke: string, unlock: Unlock): Paint => ({ id, name, fill, stroke, unlock })
+const paint = (id: string, name: string, fill: string, stroke: string, unlock: Unlock): Paint => ({ id: `paint-${id}`, name, fill, stroke, unlock })
 export const PAINTS: Paint[] = [
   paint('red', 'Red', '#ef4444', '#7f1d1d', { type: 'default' }),
   paint('blue', 'Blue', '#3b82f6', '#1e3a8a', { type: 'default' }),
@@ -126,13 +126,12 @@ export const PAINTS: Paint[] = [
   paint('rainbow', 'Rainbow', 'url(#rq-rainbow)', '#1e1b4b', { type: 'xp', xp: 2000 }),
 ]
 export const PAINT_BY_ID: Record<string, Paint> = Object.fromEntries(PAINTS.map((p) => [p.id, p]))
-export function defaultPaintIds(): string[] {
-  return PAINTS.filter((p) => p.unlock.type === 'default').map((p) => `paint-${p.id}`)
-}
+/** Everything that can be unlocked and shows up in `Progress.unlockedParts`. */
+export const UNLOCKABLES: { id: string; unlock: Unlock }[] = [...PARTS, ...PAINTS]
 
 /** What the child is wearing: a part id per slot (null = nothing), plus paint for the hat and outfit. */
 export interface Look extends Record<Slot, string | null> {
-  /** Paint id applied to the hat (null = the hat's own colour). */
+  /** Paint id ("paint-red") applied to the hat (null = the hat's own colour). */
   hatPaint?: string | null
   /** Paint id applied to the outfit. */
   outfitPaint?: string | null
@@ -147,7 +146,7 @@ export function partsForSlot(slot: Slot, base: CharacterBase): Part[] {
 }
 
 export function defaultPartIds(): string[] {
-  return [...PARTS.filter((p) => p.unlock.type === 'default').map((p) => p.id), ...defaultPaintIds()]
+  return UNLOCKABLES.filter((p) => p.unlock.type === 'default').map((p) => p.id)
 }
 
 export function colorOf(look: Look, base: CharacterBase): { body: string; accent: string } {

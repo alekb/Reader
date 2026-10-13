@@ -6,7 +6,7 @@ import { TRICKY_WORDS } from '../content/trickyWords'
 import { PARTS, levelFor, defaultLook } from '../content/parts'
 import { pickSticker, STICKERS } from '../content/stickers'
 import { migrateProgress } from './progress'
-import { newlyUnlockedParts } from './curriculum'
+import { newlyUnlockedIds } from './curriculum'
 import { applyAnswer, newItem, masteryOf, bumpStreak, currentStreak, DAY_MS } from './scheduler'
 import { buildLesson, sentenceWords, wordGpcs } from './lessonBuilder'
 import { makeNonsenseWord } from './nonsense'
@@ -178,13 +178,14 @@ describe('parts, levels and stickers', () => {
   it('unlocks parts by stars, sessions and islands', () => {
     const now = Date.now()
     const p = createProgress('Kid', 'robot', now)
-    expect(newlyUnlockedParts(p, now)).toEqual([])
+    expect(newlyUnlockedIds(p, now)).toEqual([])
     const rich: Progress = { ...p, xp: 100, sessionsCompleted: 5, completedGroups: [1] }
-    const ids = newlyUnlockedParts(rich, now).map((x) => x.id)
+    const ids = newlyUnlockedIds(rich, now)
     expect(ids).toContain('color-robot-lime')
     expect(ids).toContain('outfit-scarf')
     expect(ids).toContain('outfit-bowtie')
     expect(ids).toContain('hat-cap')
+    expect(ids).toContain('paint-pink')
     expect(ids).toContain('color-dragon-lime') // colour tiers unlock for every buddy so switching keeps the tier
   })
   it('migrates a v1 save with skins into parts', () => {
@@ -198,6 +199,15 @@ describe('parts, levels and stickers', () => {
     expect(m.unlockedParts).toContain('outfit-medal')
     expect(m.xp).toBe(200)
     expect(m.stickers).toEqual([])
+    expect(m.unlockedParts).toContain('paint-red')
+  })
+  it('back-fills default paints into an existing v2 save', () => {
+    const now = Date.now()
+    const p = { ...createProgress('Kid', 'robot', now), unlockedParts: ['color-robot-classic'] }
+    const m = migrateProgress(p)!
+    expect(m).not.toBe(p)
+    expect(m.unlockedParts).toContain('paint-blue')
+    expect(migrateProgress(m)).toBe(m)
   })
   it('sticker picks prefer unowned stickers', () => {
     const owned = STICKERS.slice(0, -1).map((s) => s.id)

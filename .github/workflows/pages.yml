@@ -3,9 +3,9 @@ name: Deploy web app to GitHub Pages
 # The first run enables Pages automatically; if that fails, enable it once under
 # Settings → Pages → Source: "GitHub Actions".
 # The app is then served at https://<user>.github.io/<repo>/ and installable as a PWA.
+# Manual: GitHub Pages needs a public repo (or a paid plan). Run it from the
+# Actions tab once Pages is enabled under Settings → Pages → Source: GitHub Actions.
 on:
-  push:
-    branches: [main, master, 'claude/**']
   workflow_dispatch:
 
 permissions:

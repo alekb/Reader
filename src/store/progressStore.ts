@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CharacterBase } from '../content/characters'
-import { PART_BY_ID, levelFor } from '../content/parts'
+import { PAINT_BY_ID, PART_BY_ID, levelFor } from '../content/parts'
 import type { Slot } from '../content/parts'
 import { pickSticker } from '../content/stickers'
 import type { ActivityResult, Progress, SessionLog } from '../engine/types'
 import { applyResult, createProgress, introduce, migrateProgress, xpFor } from '../engine/progress'
-import { advanceGroups, newlyUnlockedPaints, newlyUnlockedParts } from '../engine/curriculum'
+import { advanceGroups, newlyUnlockedIds } from '../engine/curriculum'
 import { bumpStreak, dayKey } from '../engine/scheduler'
 import { mergeProgress, mergeSessions } from '../firebase/sync'
 import { setSfxEnabled } from '../speech/sfx'
@@ -139,9 +139,8 @@ export const useProgress = create<ProgressState>()(
         const newGroups = next.completedGroups.filter((g) => !before.has(g))
         next.xp += newGroups.length * 50
         const levelBefore = levelFor(progress.xp)
-        const unlocked = newlyUnlockedParts(next, now)
-        const paints = newlyUnlockedPaints(next, now)
-        next.unlockedParts = [...next.unlockedParts, ...unlocked.map((s) => s.id), ...paints]
+        const unlocked = newlyUnlockedIds(next, now)
+        next.unlockedParts = [...next.unlockedParts, ...unlocked]
         const levelAfter = levelFor(next.xp)
         const eggAvailable = completed && next.lastEggDay !== dayKey(now)
         const log: SessionLog = {
@@ -160,7 +159,7 @@ export const useProgress = create<ProgressState>()(
           completed,
           steps: Object.entries(active.steps).map(([kind, v]) => ({ kind, ...v })),
         }
-        const summary: SessionSummary = { log, unlockedPartIds: unlocked.map((s) => s.id), completedGroups: newGroups, accuracy, levelUp: levelAfter > levelBefore ? levelAfter : null, eggAvailable }
+        const summary: SessionSummary = { log, unlockedPartIds: unlocked, completedGroups: newGroups, accuracy, levelUp: levelAfter > levelBefore ? levelAfter : null, eggAvailable }
         // Keep the newest 400 sessions locally; the cloud keeps everything.
         const nextSessions = [...sessions, log].slice(-400)
         set({ progress: next, sessions: nextSessions, active: null, lastSummary: summary, dirty: get().dirty + 1 })
@@ -181,7 +180,7 @@ export const useProgress = create<ProgressState>()(
       setPaint: (target, paintId) => {
         const p = get().progress
         if (!p) return
-        if (paintId && !p.unlockedParts.includes(`paint-${paintId}`)) return
+        if (paintId && (!PAINT_BY_ID[paintId] || !p.unlockedParts.includes(paintId))) return
         const key = target === 'hat' ? 'hatPaint' : 'outfitPaint'
         set({ progress: { ...p, look: { ...p.look, [key]: paintId }, updatedAt: Date.now() }, dirty: get().dirty + 1 })
       },
@@ -238,7 +237,7 @@ export const useProgress = create<ProgressState>()(
     }),
     {
       name: 'reader-quest-progress',
-      version: 2,
+      version: 3,
       partialize: (s) => ({ progress: s.progress, sessions: s.sessions, lastSummary: s.lastSummary }),
       migrate: (persisted) => {
         const st = persisted as { progress?: unknown; sessions?: SessionLog[]; lastSummary?: SessionSummary | null }
@@ -246,10 +245,9 @@ export const useProgress = create<ProgressState>()(
       },
       onRehydrateStorage: () => (state) => {
         if (state?.progress) {
-          if (state.progress.version !== 2 || !state.progress.look) {
-            const migrated = migrateProgress(state.progress)
-            if (migrated) useProgress.setState({ progress: migrated })
-          }
+          // Always run the migration: it is cheap and back-fills new default unlocks.
+          const migrated = migrateProgress(state.progress)
+          if (migrated && migrated !== state.progress) useProgress.setState({ progress: migrated })
           setSfxEnabled(state.progress.settings.sfx)
           setVoiceRate(state.progress.settings.voiceRate)
         }

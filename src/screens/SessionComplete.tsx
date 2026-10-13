@@ -47,7 +47,7 @@ export function SessionComplete() {
   const level = levelFor(progress.xp)
   const newGroups = summary.completedGroups.map((id) => GROUPS.find((g) => g.id === id)!).filter(Boolean)
   const newParts = summary.unlockedPartIds.map((id) => PART_BY_ID[id]).filter((p) => p && (!p.base || p.base === progress.character))
-  const newPaints = summary.unlockedPartIds.filter((id) => id.startsWith('paint-')).map((id) => PAINT_BY_ID[id.slice(6)]).filter(Boolean)
+  const newPaints = summary.unlockedPartIds.map((id) => PAINT_BY_ID[id]).filter(Boolean)
   const showEgg = summary.eggAvailable && !eggGone
 
   const hatch = () => {
