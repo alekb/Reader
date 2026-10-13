@@ -9,6 +9,7 @@ import { collection, doc, getDoc, getDocs, setDoc, writeBatch } from 'firebase/f
 import type { Firestore } from 'firebase/firestore'
 import type { Progress, SessionLog } from '../engine/types'
 import type { ItemState } from '../engine/types'
+import { migrateProgress } from '../engine/progress'
 
 function mergeItems(a: Record<string, ItemState>, b: Record<string, ItemState>): Record<string, ItemState> {
   const out: Record<string, ItemState> = { ...a }
@@ -26,7 +27,9 @@ function maxMap(a: Record<string, number>, b: Record<string, number>): Record<st
 }
 
 /** Merge two progress snapshots without losing work done on either device. */
-export function mergeProgress(local: Progress | null, remote: Progress | null): Progress | null {
+export function mergeProgress(localIn: Progress | null, remoteIn: Progress | null): Progress | null {
+  const local = localIn ? migrateProgress(localIn) : null
+  const remote = remoteIn ? migrateProgress(remoteIn) : null
   if (!local) return remote
   if (!remote) return local
   const base = remote.updatedAt > local.updatedAt ? remote : local
@@ -42,7 +45,9 @@ export function mergeProgress(local: Progress | null, remote: Progress | null): 
     completedGroups: [...new Set([...local.completedGroups, ...remote.completedGroups])].sort((a, b) => a - b),
     currentGroup: Math.max(local.currentGroup, remote.currentGroup),
     sessionsCompleted: Math.max(local.sessionsCompleted, remote.sessionsCompleted),
-    unlockedSkins: [...new Set([...local.unlockedSkins, ...remote.unlockedSkins])],
+    unlockedParts: [...new Set([...local.unlockedParts, ...remote.unlockedParts])],
+    stickers: [...new Set([...local.stickers, ...remote.stickers])],
+    lastEggDay: local.lastEggDay > remote.lastEggDay ? local.lastEggDay : remote.lastEggDay,
     streak,
     createdAt: Math.min(local.createdAt, remote.createdAt),
     updatedAt: Math.max(local.updatedAt, remote.updatedAt),
@@ -60,7 +65,7 @@ export function mergeSessions(local: SessionLog[], remote: SessionLog[]): Sessio
 
 export async function fetchRemote(db: Firestore, uid: string): Promise<{ progress: Progress | null; sessions: SessionLog[] }> {
   const snap = await getDoc(doc(db, 'users', uid))
-  const progress = (snap.exists() ? (snap.data().progress as Progress | undefined) : undefined) ?? null
+  const progress = snap.exists() ? migrateProgress(snap.data().progress) : null
   const sessSnap = await getDocs(collection(db, 'users', uid, 'sessions'))
   const sessions = sessSnap.docs.map((d) => d.data() as SessionLog)
   return { progress, sessions }

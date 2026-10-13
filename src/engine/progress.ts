@@ -1,16 +1,17 @@
 import type { CharacterBase } from '../content/characters'
-import { SKINS, defaultSkin } from '../content/characters'
+import { defaultLook, defaultPartIds, PART_BY_ID } from '../content/parts'
 import type { ActivityResult, Progress } from './types'
 import { applyAnswer, newItem } from './scheduler'
 
 export function createProgress(childName: string, character: CharacterBase, now: number): Progress {
-  const skin = defaultSkin(character)
   return {
-    version: 1,
+    version: 2,
     childName,
     character,
-    skinId: skin.id,
-    unlockedSkins: SKINS.filter((s) => s.unlock.type === 'default').map((s) => s.id),
+    look: defaultLook(character),
+    unlockedParts: defaultPartIds(),
+    stickers: [],
+    lastEggDay: '',
     xp: 0,
     wordsRead: 0,
     knownWords: {},
@@ -75,4 +76,51 @@ export function introduce(p: Progress, kind: 'gpc' | 'tricky', id: string, now: 
   if (map[id]) return p
   const copy = { ...map, [id]: newItem(now) }
   return kind === 'gpc' ? { ...p, gpcs: copy, updatedAt: now } : { ...p, tricky: copy, updatedAt: now }
+}
+
+/**
+ * Upgrade a progress object saved by an older version of the app (locally or
+ * in the cloud). Old whole-skin ids become colour + accessory parts.
+ */
+export function migrateProgress(raw: unknown): Progress | null {
+  if (!raw || typeof raw !== 'object') return null
+  const p = raw as Record<string, unknown>
+  if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) {
+    const cur = p as unknown as Progress
+    const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds()])]
+    return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
+  }
+  const base = (['robot', 'dragon', 'monster'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
+  const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()))
+  const out: Progress = { ...fresh, ...(p as Partial<Progress>), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
+  // Translate the old skin catalogue (v1) into parts.
+  const oldSkins: string[] = Array.isArray(p.unlockedSkins) ? (p.unlockedSkins as string[]) : []
+  const accessoryToPart: Record<string, string> = {
+    cap: 'hat-cap', wizard: 'hat-wizard', crown: 'hat-crown', pirate: 'hat-pirate', astro: 'hat-astro', party: 'hat-party', bandana: 'hat-bandana', flower: 'hat-flower', bow: 'hat-bow', halo: 'hat-halo',
+    glasses: 'face-glasses', sunglasses: 'face-sunglasses', headphones: 'face-headphones', scarf: 'outfit-scarf', cape: 'outfit-cape', backpack: 'outfit-backpack', shield: 'outfit-shield', medal: 'outfit-medal',
+  }
+  const islandAccessory: Record<number, string> = { 1: 'cap', 2: 'glasses', 3: 'scarf', 4: 'headphones', 5: 'flower', 6: 'bandana', 7: 'astro', 8: 'pirate', 9: 'halo', 10: 'shield', 11: 'sunglasses', 12: 'cape', 13: 'backpack', 14: 'wizard', 15: 'medal', 16: 'crown' }
+  const tierColor: Record<string, string> = { stars60: 'lime', lime: 'lime', fire: 'lime', slime: 'lime', stars150: 'berry', stars300: 'sky', stars600: 'sunset', stars1000: 'midnight', stars1500: 'golden' }
+  const add = (id: string) => {
+    if (PART_BY_ID[id] && !out.unlockedParts.includes(id)) out.unlockedParts.push(id)
+  }
+  for (const sk of oldSkins) {
+    const m = /^(robot|dragon|monster)-(.+)$/.exec(sk)
+    if (!m) continue
+    const [, b, key] = m
+    if (tierColor[key]) add(`color-${b}-${tierColor[key]}`)
+    const isl = /^island(\d+)$/.exec(key)
+    if (isl) add(accessoryToPart[islandAccessory[Number(isl[1])]] ?? '')
+    if (key === 'streak3' || key === 'streak') add('hat-party')
+    if (key === 'streak7') add('hat-bow')
+    if (key === 'words30') add('outfit-badge')
+    if (key === 'words100' || key === 'gold' || key === 'crown') add('outfit-medal')
+    if (key === 'words250') add('hat-halo')
+    if (key === 'wizard') add('hat-wizard')
+    if (key === 'astro' || key === 'ice') add('hat-astro')
+    if (key === 'headphones' || key === 'pirate') add('face-headphones')
+    if (key === 'glasses') add('face-glasses')
+    if (key === 'cap' || key === 'bow') add('hat-cap')
+  }
+  return out
 }

@@ -14,6 +14,11 @@ await ctx.addInitScript(() => {
   const synth = { speak: (u) => setTimeout(() => u.onend && u.onend(), 10), cancel() {}, getVoices: () => [], addEventListener() {} }
   Object.defineProperty(window, 'speechSynthesis', { value: synth })
   window.SpeechSynthesisUtterance = function (t) { this.text = t }
+  // Headless Chromium has no audio output: make bundled clips "finish" instantly.
+  HTMLMediaElement.prototype.play = function () {
+    setTimeout(() => this.dispatchEvent(new Event('ended')), 10)
+    return Promise.resolve()
+  }
 })
 const page = await ctx.newPage()
 const errors = []
@@ -71,7 +76,7 @@ await page.click('text=Play')
 await page.waitForTimeout(800)
 await shot('05-lesson-start')
 let step = 0
-for (let i = 0; i < 80; i++) {
+for (let i = 0; i < 160; i++) {
   await page.waitForTimeout(400)
   const url = page.url()
   if (url.includes('/done')) break

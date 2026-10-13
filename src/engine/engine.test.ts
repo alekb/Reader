@@ -3,7 +3,10 @@ import { GPCS, GROUPS, GPC_BY_ID } from '../content/gpcs'
 import { WORDS, letterSegments } from '../content/words'
 import { SENTENCES } from '../content/sentences'
 import { TRICKY_WORDS } from '../content/trickyWords'
-import { SKINS } from '../content/characters'
+import { PARTS, levelFor, defaultLook } from '../content/parts'
+import { pickSticker, STICKERS } from '../content/stickers'
+import { migrateProgress } from './progress'
+import { newlyUnlockedIds } from './curriculum'
 import { applyAnswer, newItem, masteryOf, bumpStreak, currentStreak, DAY_MS } from './scheduler'
 import { buildLesson, sentenceWords, wordGpcs } from './lessonBuilder'
 import { makeNonsenseWord } from './nonsense'
@@ -62,10 +65,12 @@ describe('content integrity', () => {
       }
     }
   })
-  it('skins have a default per character', () => {
-    for (const base of ['robot', 'dragon', 'monster']) {
-      expect(SKINS.filter((s) => s.base === base && s.unlock.type === 'default').length).toBe(1)
+  it('every character has a default colour part and part ids are unique', () => {
+    for (const base of ['robot', 'dragon', 'monster'] as const) {
+      expect(PARTS.filter((p) => p.slot === 'color' && p.base === base && p.unlock.type === 'default').length).toBe(1)
+      expect(PARTS.find((p) => p.id === defaultLook(base).color)).toBeDefined()
     }
+    expect(new Set(PARTS.map((p) => p.id)).size).toBe(PARTS.length)
   })
 })
 
@@ -158,5 +163,54 @@ describe('nonsense words', () => {
       expect(w).not.toBeNull()
       expect(WORDS.find((x) => x.word === w!.word)).toBeUndefined()
     }
+  })
+})
+
+describe('parts, levels and stickers', () => {
+  it('levels follow the star thresholds', () => {
+    expect(levelFor(0)).toBe(1)
+    expect(levelFor(99)).toBe(1)
+    expect(levelFor(100)).toBe(2)
+    expect(levelFor(300)).toBe(3)
+    expect(levelFor(1500)).toBe(5)
+    expect(levelFor(99999)).toBe(5)
+  })
+  it('unlocks parts by stars, sessions and islands', () => {
+    const now = Date.now()
+    const p = createProgress('Kid', 'robot', now)
+    expect(newlyUnlockedIds(p, now)).toEqual([])
+    const rich: Progress = { ...p, xp: 100, sessionsCompleted: 5, completedGroups: [1] }
+    const ids = newlyUnlockedIds(rich, now)
+    expect(ids).toContain('color-robot-lime')
+    expect(ids).toContain('outfit-scarf')
+    expect(ids).toContain('outfit-bowtie')
+    expect(ids).toContain('hat-cap')
+    expect(ids).toContain('paint-pink')
+    expect(ids).toContain('color-dragon-lime') // colour tiers unlock for every buddy so switching keeps the tier
+  })
+  it('migrates a v1 save with skins into parts', () => {
+    const old = { version: 1, childName: 'Leo', character: 'dragon', skinId: 'dragon-island1', unlockedSkins: ['dragon-classic', 'dragon-island1', 'dragon-stars60', 'dragon-words100'], xp: 200, wordsRead: 3, knownWords: {}, gpcs: {}, tricky: {}, groupWords: {}, completedGroups: [1], currentGroup: 2, sessionsCompleted: 3, lastSessionAccuracy: 0.9, streak: { count: 1, lastDay: '' }, dailyGoalMin: 12, settings: { sfx: true, voiceRate: 0.9 }, createdAt: 1, updatedAt: 2 }
+    const m = migrateProgress(old)!
+    expect(m.version).toBe(2)
+    expect(m.character).toBe('dragon')
+    expect(m.look.color).toBe('color-dragon-classic')
+    expect(m.unlockedParts).toContain('hat-cap')
+    expect(m.unlockedParts).toContain('color-dragon-lime')
+    expect(m.unlockedParts).toContain('outfit-medal')
+    expect(m.xp).toBe(200)
+    expect(m.stickers).toEqual([])
+    expect(m.unlockedParts).toContain('paint-red')
+  })
+  it('back-fills default paints into an existing v2 save', () => {
+    const now = Date.now()
+    const p = { ...createProgress('Kid', 'robot', now), unlockedParts: ['color-robot-classic'] }
+    const m = migrateProgress(p)!
+    expect(m).not.toBe(p)
+    expect(m.unlockedParts).toContain('paint-blue')
+    expect(migrateProgress(m)).toBe(m)
+  })
+  it('sticker picks prefer unowned stickers', () => {
+    const owned = STICKERS.slice(0, -1).map((s) => s.id)
+    expect(pickSticker(owned, () => 0.5).id).toBe(STICKERS[STICKERS.length - 1].id)
   })
 })

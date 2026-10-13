@@ -4,7 +4,7 @@
  * / Jolly Phonics sequence: the first six letters (s a t p i n) already allow
  * dozens of real words (sat, pin, tap, nap ...), so blending starts on day one.
  *
- * `speak` is the text handed to the text-to-speech engine when no recorded
+ * All speech is American English (en-US). `speak` is the text handed to the text-to-speech engine when no recorded
  * clip for the sound exists in /public/audio/sounds/<id>.mp3. Pure sounds are
  * approximated (continuous sounds are stretched: "sss", stop sounds are as
  * short as the engine allows). Recorded clips always win when present.
@@ -76,19 +76,19 @@ export const GPCS: Gpc[] = [
   g('t', '/t/', 't', 'tiger', '🐯', 'Tap your finger like a tiny drum: t, t, t', false, 1, { letterName: 'tee' }),
   g('p', '/p/', 'p', 'pig', '🐷', 'Puff out a tiny breath like a candle: p, p, p', false, 1, { letterName: 'pee' }),
   // ---- Group 2: i n m d ----
-  g('i', '/i/', 'i', 'igloo', '🧊', 'Wiggle your fingers like an itchy mouse: i, i, i', true, 2, { letterName: 'eye', vowel: true }),
+  g('i', '/i/', 'ih', 'igloo', '🧊', 'Wiggle your fingers like an itchy mouse: i, i, i', true, 2, { letterName: 'eye', vowel: true }),
   g('n', '/n/', 'nnn', 'nest', '🪺', 'Buzz like a plane with your arms out: nnnnn', true, 2, { letterName: 'en' }),
   g('m', '/m/', 'mmm', 'moon', '🌙', 'Rub your tummy like yummy food: mmmmm', true, 2, { letterName: 'em' }),
   g('d', '/d/', 'd', 'dog', '🐶', 'Beat a drum: d, d, d', false, 2, { letterName: 'dee' }),
   // ---- Group 3: g o c k ----
   g('g', '/g/', 'g', 'goat', '🐐', 'Gulp like water going down: g, g, g', false, 3, { letterName: 'gee' }),
-  g('o', '/o/', 'o', 'octopus', '🐙', 'Open your mouth round like a surprised octopus: o, o, o', true, 3, { letterName: 'oh', vowel: true }),
+  g('o', '/o/', 'ah', 'octopus', '🐙', 'Open your mouth round like a surprised octopus: o, o, o', true, 3, { letterName: 'oh', vowel: true }),
   g('c', '/k/', 'k', 'cat', '🐱', 'Click castanets with your fingers: c, c, c', false, 3, { letterName: 'see' }),
   g('k', '/k/', 'k', 'kite', '🪁', 'Kick a tiny kick: k, k, k', false, 3, { letterName: 'kay' }),
   // ---- Group 4: ck e u r ----
   g('ck', '/k/', 'k', 'duck', '🦆', 'Two letters, one sound: ck says k, like duck', false, 4),
-  g('e', '/e/', 'e', 'egg', '🥚', 'Crack an egg into a pan: e, e, e', true, 4, { letterName: 'ee', vowel: true }),
-  g('u', '/u/', 'u', 'umbrella', '☂️', 'Put up your umbrella: u, u, u', true, 4, { letterName: 'you', vowel: true }),
+  g('e', '/e/', 'eh', 'egg', '🥚', 'Crack an egg into a pan: e, e, e', true, 4, { letterName: 'ee', vowel: true }),
+  g('u', '/u/', 'uh', 'umbrella', '☂️', 'Put up your umbrella: u, u, u', true, 4, { letterName: 'you', vowel: true }),
   g('r', '/r/', 'rrr', 'rabbit', '🐰', 'Growl like a puppy with a sock: rrrrr', true, 4, { letterName: 'ar' }),
   // ---- Group 5: h b f ff l ll ss ----
   g('h', '/h/', 'h', 'hat', '🎩', 'Pant like you just ran: h, h, h', false, 5, { letterName: 'aitch' }),
@@ -99,7 +99,7 @@ export const GPCS: Gpc[] = [
   g('ll', '/l/', 'lll', 'bell', '🔔', 'Same sound as l, just two letters: lllll', true, 5),
   g('ss', '/s/', 'sss', 'kiss', '💋', 'Same sound as s, just two letters: sssss', true, 5),
   // ---- Group 6: j v w x ----
-  g('j', '/j/', 'j', 'jelly', '🍮', 'Wobble like jelly: j, j, j', false, 6, { letterName: 'jay' }),
+  g('j', '/j/', 'j', 'jet', '✈️', 'Zoom like a jet: j, j, j', false, 6, { letterName: 'jay' }),
   g('v', '/v/', 'vvv', 'van', '🚐', 'Hold a steering wheel and drive: vvvvv', true, 6, { letterName: 'vee' }),
   g('w', '/w/', 'w', 'web', '🕸️', 'Blow like the wind: w, w, w', false, 6, { letterName: 'double you' }),
   g('x', '/ks/', 'ks', 'box', '📦', 'Cross your arms like an X: ks, ks, ks', false, 6, { letterName: 'ex' }),
@@ -161,9 +161,9 @@ export const GROUPS: GpcGroup[] = [
   { id: 3, title: 'Goat Mountain', tagline: 'Climb up with g, o, c and k.', gpcIds: ['g', 'o', 'c', 'k'], theme: { name: 'mountain', emoji: '⛰️', color: '#a78bfa' } },
   { id: 4, title: 'Duck Pond', tagline: 'ck, e, u and r join the team.', gpcIds: ['ck', 'e', 'u', 'r'], theme: { name: 'pond', emoji: '🦆', color: '#38bdf8' } },
   { id: 5, title: 'Jungle Fun', tagline: 'h, b, f, l and the double letters.', gpcIds: ['h', 'b', 'f', 'ff', 'l', 'll', 'ss'], theme: { name: 'jungle', emoji: '🌴', color: '#22c55e' } },
-  { id: 6, title: 'Jelly Volcano', tagline: 'j, v, w and x.', gpcIds: ['j', 'v', 'w', 'x'], theme: { name: 'volcano', emoji: '🌋', color: '#f97316' } },
+  { id: 6, title: 'Jet Volcano', tagline: 'j, v, w and x.', gpcIds: ['j', 'v', 'w', 'x'], theme: { name: 'volcano', emoji: '🌋', color: '#f97316' } },
   { id: 7, title: 'Zebra Castle', tagline: 'y, z, zz and qu. The whole alphabet!', gpcIds: ['y', 'z', 'zz', 'qu'], theme: { name: 'castle', emoji: '🏰', color: '#e879f9' } },
-  { id: 8, title: 'Ship Harbour', tagline: 'Two letters, one sound: ch, sh, th, ng.', gpcIds: ['ch', 'sh', 'th', 'ng'], theme: { name: 'harbour', emoji: '🚢', color: '#0ea5e9' } },
+  { id: 8, title: 'Ship Harbor', tagline: 'Two letters, one sound: ch, sh, th, ng.', gpcIds: ['ch', 'sh', 'th', 'ng'], theme: { name: 'harbor', emoji: '🚢', color: '#0ea5e9' } },
   { id: 9, title: 'Rainbow Sky', tagline: 'Vowel teams: ai, ee, igh, oa.', gpcIds: ['ai', 'ee', 'igh', 'oa'], theme: { name: 'sky', emoji: '🌈', color: '#f472b6' } },
   { id: 10, title: 'Moon Base', tagline: 'oo, oo, ar and or.', gpcIds: ['oo_long', 'oo_short', 'ar', 'or'], theme: { name: 'moon', emoji: '🌕', color: '#818cf8' } },
   { id: 11, title: 'Turtle Cove', tagline: 'ur, ow, oi and ear.', gpcIds: ['ur', 'ow', 'oi', 'ear'], theme: { name: 'cove', emoji: '🐢', color: '#2dd4bf' } },

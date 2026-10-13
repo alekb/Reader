@@ -20,6 +20,12 @@ export function setVoiceRate(rate: number) {
   baseRate = rate
 }
 
+/** Optional lookup of a pre-recorded clip for an exact phrase (set by phonics.ts). */
+let phraseResolver: ((text: string) => Promise<string | null>) | null = null
+export function setPhraseResolver(fn: (text: string) => Promise<string | null>) {
+  phraseResolver = fn
+}
+
 let generation = 0
 let chain: Promise<void> = Promise.resolve()
 let preferredVoice: SpeechSynthesisVoice | null = null
@@ -92,7 +98,10 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
   const gen = generation
   const run = async () => {
     if (gen !== generation) return
-    if (isNative) await speakNative(text, opts, gen)
+    const clip = phraseResolver ? await phraseResolver(text).catch(() => null) : null
+    if (gen !== generation) return
+    if (clip) await playClip(clip)
+    else if (isNative) await speakNative(text, opts, gen)
     else await speakWeb(text, opts, gen)
     if (opts.pauseAfter && gen === generation) await sleep(opts.pauseAfter)
   }

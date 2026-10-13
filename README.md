@@ -2,7 +2,7 @@
 
 A phonics adventure that teaches a child to read. Built for an 8-year-old late starter who knows part of the alphabet: it runs as a web app (PWA) in any modern browser and as an Android app via Capacitor, speaks every sound, word and sentence, rewards effort with character skins, saves progress to the cloud, and gives parents a dashboard.
 
-The teaching method is systematic synthetic phonics (the approach with the strongest evidence for beginning and struggling readers). The research behind every design decision is in [`docs/RESEARCH.md`](docs/RESEARCH.md).
+All speech and spelling is American English. The teaching method is systematic synthetic phonics (the approach with the strongest evidence for beginning and struggling readers). The research behind every design decision is in [`docs/RESEARCH.md`](docs/RESEARCH.md).
 
 <p>
 <img src="docs/screenshots/home.png" width="180"> <img src="docs/screenshots/new-sound.png" width="180"> <img src="docs/screenshots/read-words.png" width="180"> <img src="docs/screenshots/session-done.png" width="180"> <img src="docs/screenshots/dashboard.png" width="180">
@@ -14,7 +14,7 @@ Every session takes 10–15 minutes and always has the same shape (predictabilit
 
 | Step | What happens | Why |
 |---|---|---|
-| 1. Speed sounds | Hear a sound (or heart word), tap it among look-alikes. Response time is measured. | Spaced review of everything learnt so far; automaticity check |
+| 1. Speed sounds | Hear a sound (or heart word), tap it among look-alikes. Response time is measured. | Spaced review of everything learned so far; automaticity check |
 | 2. Robot talk | The mascot says a word sound by sound (no letters on screen); the child taps the picture. | Oral blending / phonemic awareness |
 | 3. New sound | Big letter card with keyword picture and action; hear the pure sound and the letter name; trace lowercase and uppercase with a finger; find it among distractors; find it inside a word. | See–hear–say–trace multisensory introduction |
 | 4. Read words | Sound buttons for each grapheme, "sound it out", then prove it by tapping the matching picture or the word you hear. One "alien" (nonsense) word per set. | Blending; nonsense words make guessing impossible |
@@ -30,7 +30,11 @@ Rules the engine follows (from `docs/RESEARCH.md` §10):
 - **New material only when ready**: at most one new sound per session (two in the first two sessions), none if the review sweep is below 85% or the last session was below 70%, every 4th session is review-only.
 - **Error script**: wrong answer → the app models the right answer, says it with the child, then asks again ("your turn").
 - **Mastery**: an item is "mastered" after 3 correct scheduled reviews on 3 different days.
-- **Rewards never depend on accuracy**: stars come from effort; skins unlock for stars, islands finished, streaks and words read.
+- **Rewards never depend on accuracy**: stars come from effort. Rewards are layered so something new happens almost every session:
+  - **Mix-and-match parts** (36 per buddy): body colour, hat, face, outfit and aura are separate unlocks tied to stars, islands, streaks, words read, sessions and sounds mastered.
+  - **Character levels**: the buddy itself grows at 100, 300, 700 and 1500 stars (antennas, wings, horns, jet boots, fire, auras).
+  - **Surprise egg**: the first finished session each day hatches a sticker for the 60-sticker book.
+  - **Tricks**: tapping the buddy on the home screen plays a trick; new tricks unlock as sounds become secure.
 
 ## Quick start (web)
 
@@ -65,7 +69,9 @@ users/{uid}/recordings/{key}     parent-recorded sound clips (base64)
 
 ## Android app (Capacitor)
 
-The Android project is generated in `android/`. You need Android Studio (or the Android SDK + JDK 17+).
+**No SDK needed:** every push runs the "Android APK" GitHub Actions workflow, which builds a debug APK on GitHub's runners. Open the repo's **Actions** tab → latest run → **Artifacts** → `reader-quest-debug-apk`, copy `app-debug.apk` to the phone and install it (allow "install unknown apps"). To bake cloud sync into that APK, add the `VITE_FIREBASE_*` values as repository secrets (Settings → Secrets and variables → Actions).
+
+To build locally instead, the Android project is in `android/` and you need Android Studio (or the Android SDK + JDK 17+):
 
 ```bash
 npm run build
@@ -81,6 +87,21 @@ Change the app id / name in `capacitor.config.ts` before publishing.
 
 ## Deploying the web version
 
+**Fastest (no account needed):** download the `reader-quest-web` artifact from the latest Actions run, unzip it, and drag the folder onto <https://app.netlify.com/drop>. You get a public URL in seconds.
+
+**Firebase Hosting (free, works with a private repo, same project as cloud sync):**
+
+```bash
+npm i -g firebase-tools
+firebase login
+npm run build
+firebase deploy --only hosting --project <your-firebase-project-id>
+```
+
+`firebase.json` is already set up (serves `dist/`, single-page rewrite, cache headers). The app is then at `https://<project-id>.web.app`.
+
+**GitHub Pages:** free only for public repos. Make the repo public (Settings → General → Danger Zone → Change visibility), then Settings → Pages → Source: **GitHub Actions** and re-run the "Deploy web app to GitHub Pages" workflow. It publishes at `https://<user>.github.io/<repo>/`.
+
 `dist/` is a static site. Any static host works (Firebase Hosting, Netlify, Vercel, GitHub Pages). For Firebase Hosting:
 
 ```bash
@@ -92,13 +113,27 @@ npm run build && firebase deploy
 
 The app is a PWA: on Android Chrome it can be installed to the home screen and works offline.
 
-## Making the sounds perfect: record them yourself
+## Audio: studio voice, bundled and offline
 
-Text-to-speech engines cannot say pure phonemes well: "t" tends to come out as "tee" or "tuh". The app uses the best approximations it can, always pairs each sound with its keyword ("/s/ like snake"), but the recommended fix is to record the sounds in your own voice:
+All sounds, letter names, words, sentences and the mascot's lines are pre-generated with **Google Cloud Text-to-Speech** (voice `en-US-Neural2-F`) and shipped in `public/audio/` with a `manifest.json`. The app plays these clips first, on the web and on Android, so speech is consistent, works offline and needs no API key at runtime. Anything not in the manifest (for example a sentence that includes the child's name) falls back to the device's own voice.
 
-Home → **Parents** → **Settings** → **Record the sounds in your own voice**. Each recording stops automatically after 2.5 s, replaces the computer voice for that sound everywhere in the app, and is synced to the cloud when signed in. Tips are shown on screen (say "mmm", not "em"; keep stop sounds short: "t", not "tuh").
+Pure consonant sounds are the hard part: TTS engines cannot say a lone "t". The generator (`scripts/generate-audio.mjs`) synthesizes each consonant inside a syllable from IPA and cuts the vowel off with a band-energy analysis, so you get a hissing "sss", a humming "mmm" and a clipped "t" rather than "tuh".
 
-You can also drop pre-recorded clips into `public/audio/sounds/<id>.mp3` (ids are the `id` fields in `src/content/gpcs.ts`, e.g. `s.mp3`, `sh.mp3`, `oo_long.mp3`); they are used automatically.
+To regenerate (after changing content, or to try another voice):
+
+```bash
+# .env: GOOGLE_TTS_API_KEY=...   (Cloud Text-to-Speech API enabled on your Google Cloud project)
+npm run audio                 # only generates clips that are missing
+npm run audio -- --force      # regenerate everything
+npm run audio -- --only sounds --analyze   # regenerate the 66 sounds and print a frame-by-frame picture of each
+TTS_VOICE=en-US-Neural2-C npm run audio -- --force   # a different voice
+```
+
+The whole curriculum is about 15,000 characters, well inside Google's free monthly tier.
+
+### Or record the sounds yourself
+
+Parents can still record any sound in their own voice: Home → **Parents** → **Settings** → **Record the sounds in your own voice**. Recordings take precedence over the bundled clips, and sync to the cloud when signed in.
 
 ## Parent dashboard
 
@@ -126,12 +161,12 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 ## Testing
 
-- `npm test` runs the engine tests (scheduler maths, group gating, lesson building, nonsense-word safety) and content integrity tests (every sentence only uses sounds and heart words taught by its island; every word's segmentation spells the word).
+- `npm test` runs the engine tests (scheduler math, group gating, lesson building, nonsense-word safety) and content integrity tests (every sentence only uses sounds and heart words taught by its island; every word's segmentation spells the word).
 - `npm run e2e` builds, serves and drives the whole app in headless Chromium (fresh learner and a seeded learner), screenshots every activity into `e2e/shots*/` and fails on any runtime error.
 
 ## Known limitations / ideas
 
-- Pure-sound pronunciation depends on the device's TTS voice; recording your own voice (above) is the reliable fix.
+- Dynamic mascot lines (ones that include the child's name) use the device's TTS voice; everything else is bundled studio audio.
 - The app checks answers by tapping, so a parent sitting alongside should listen for the child saying sounds and words out loud.
 - One child profile per parent account. Multiple children could be added by nesting progress under `users/{uid}/children/{childId}`.
 - Group 13 (adjacent consonants) and groups 14–16 (magic e and alternative spellings) are included; a Phase 5 "alternative pronunciations" stage (e.g. `ow` in snow vs cow) is a natural next addition.

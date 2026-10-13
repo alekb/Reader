@@ -11,7 +11,8 @@
     "test": "vitest run",
     "e2e": "bash e2e/run.sh",
     "android:sync": "npm run build && npx cap sync android",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "audio": "node --env-file=.env scripts/generate-audio.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

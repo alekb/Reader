@@ -4,8 +4,8 @@
  */
 import { GROUPS, GPC_BY_ID, gpcsThroughGroup } from '../content/gpcs'
 import { TRICKY_WORDS } from '../content/trickyWords'
-import { SKINS } from '../content/characters'
-import type { Skin } from '../content/characters'
+import { UNLOCKABLES } from '../content/parts'
+import type { Unlock } from '../content/parts'
 import { fragileCount, masteryOf, currentStreak } from './scheduler'
 import type { Progress } from './types'
 
@@ -121,21 +121,35 @@ export function summarize(p: Progress, now: number): Summary {
   }
 }
 
-/** Skins that are now unlocked but not yet in the unlocked list. */
-export function newlyUnlockedSkins(p: Progress, now: number): Skin[] {
-  const streak = currentStreak(p.streak, now)
-  const words = Object.keys(p.knownWords).length
-  return SKINS.filter((s) => {
-    if (p.unlockedSkins.includes(s.id)) return false
-    const u = s.unlock
-    switch (u.type) {
-      case 'default': return false
-      case 'xp': return p.xp >= u.xp
-      case 'group': return p.completedGroups.includes(u.group)
-      case 'streak': return streak >= u.days
-      case 'words': return words >= u.count
-    }
-  })
+/** Sounds the child knows (secure or mastered). */
+export function soundsKnown(p: Progress): number {
+  return Object.values(p.gpcs).filter((it) => it.box >= 2).length
+}
+
+/** Facts the unlock rules depend on, computed once per check. */
+interface UnlockFacts {
+  streak: number
+  words: number
+  sounds: number
+}
+
+function unlockMet(u: Unlock, p: Progress, f: UnlockFacts): boolean {
+  switch (u.type) {
+    case 'default': return true
+    case 'xp': return p.xp >= u.xp
+    case 'group': return p.completedGroups.includes(u.group)
+    case 'streak': return f.streak >= u.days
+    case 'words': return f.words >= u.count
+    case 'sessions': return p.sessionsCompleted >= u.count
+    case 'sounds': return f.sounds >= u.count
+  }
+}
+
+/** Ids of parts and paints that are now unlocked but not yet in the unlocked list. */
+export function newlyUnlockedIds(p: Progress, now: number): string[] {
+  const facts: UnlockFacts = { streak: currentStreak(p.streak, now), words: Object.keys(p.knownWords).length, sounds: soundsKnown(p) }
+  const have = new Set(p.unlockedParts)
+  return UNLOCKABLES.filter((x) => !have.has(x.id) && unlockMet(x.unlock, p, facts)).map((x) => x.id)
 }
 
 /** Convenience: all GPC ids taught through the child's current group (for content filtering). */

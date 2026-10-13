@@ -83,6 +83,57 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(253, 230, 138, 0.9); }
   50% { box-shadow: 0 0 0 14px rgba(253, 230, 138, 0); }
 }
+@keyframes jump {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-40px) scaleY(1.08); }
+  60% { transform: translateY(0) scaleY(0.92); }
+}
+@keyframes spin-once {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes dance {
+  0%, 100% { transform: rotate(-8deg) translateX(-6px); }
+  50% { transform: rotate(8deg) translateX(6px); }
+}
+@keyframes flip {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+@keyframes zoom {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(-60px) rotate(-10deg); }
+  70% { transform: translateX(60px) rotate(10deg); }
+  100% { transform: translateX(0); }
+}
+@keyframes grow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+@keyframes egg-wobble {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+@keyframes hatch {
+  0% { transform: scale(0.2); opacity: 0; }
+  70% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes aura-float {
+  0%, 100% { transform: translateY(0); opacity: 0.9; }
+  50% { transform: translateY(-6px); opacity: 1; }
+}
+@keyframes spin-slow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.animate-spin-slow { animation: spin-slow 12s linear infinite; transform-origin: 100px 110px; }
+.animate-jump { animation: jump 0.8s ease-out; }
+.animate-spin-once { animation: spin-once 0.9s ease-in-out; }
+.animate-dance { animation: dance 0.5s ease-in-out 3; }
+.animate-flip { animation: flip 0.9s ease-in-out; }
+.animate-zoom { animation: zoom 1s ease-in-out; }
+.animate-grow { animation: grow 1s ease-in-out; }
+.animate-egg { animation: egg-wobble 0.7s ease-in-out infinite; }
+.animate-hatch { animation: hatch 0.7s ease-out; }
+.aura-float { animation: aura-float 2.2s ease-in-out infinite; transform-origin: center; }
 .animate-pop { animation: pop 0.4s ease-out; }
 .animate-shake { animation: shake 0.35s ease-in-out; }
 .animate-bounce-soft { animation: bounce-soft 1.6s ease-in-out infinite; }

@@ -15,7 +15,7 @@ const BLOCKLIST = new Set([
 /** Common real words not in our bank, so we never present them as "alien". */
 const REAL_EXTRA = new Set([
   'bad', 'bid', 'bob', 'bop', 'cab', 'cob', 'cub', 'dab', 'den', 'dip', 'dob', 'dud', 'fab', 'fad', 'fen', 'fib', 'fin', 'gab', 'gag', 'gig', 'gob',
-  'gut', 'hag', 'hem', 'hob', 'hog', 'hub', 'hum', 'jig', 'jot', 'keg', 'kin', 'lab', 'lag', 'lob', 'lug', 'mob', 'mum', 'nab', 'nit', 'nun',
+  'gut', 'hag', 'hem', 'hob', 'hog', 'hub', 'hum', 'jig', 'jot', 'keg', 'kin', 'lab', 'lag', 'lob', 'lug', 'mob', 'mum', 'mom', 'nab', 'nit', 'nun',
   'pub', 'pug', 'pun', 'rib', 'rig', 'rob', 'rub', 'sag', 'sob', 'sub', 'sum', 'tab', 'tog', 'tub', 'tut', 'vim', 'wad', 'wit', 'wok', 'yen',
   'zit', 'ted', 'tom', 'sid', 'kim', 'pam', 'tin', 'nan', 'dan', 'ken', 'ben', 'meg', 'jen', 'bob', 'rod', 'nod', 'bin', 'pit', 'tip', 'mop',
 ])

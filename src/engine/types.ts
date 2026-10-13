@@ -1,4 +1,5 @@
 import type { CharacterBase } from '../content/characters'
+import type { Look } from '../content/parts'
 
 /** Leitner-box state for one learnable item (a GPC or a tricky word). */
 export interface ItemState {
@@ -19,11 +20,17 @@ export interface ItemState {
 }
 
 export interface Progress {
-  version: 1
+  version: 2
   childName: string
   character: CharacterBase
-  skinId: string
-  unlockedSkins: string[]
+  /** What the buddy is wearing (one part per slot). */
+  look: Look
+  /** Part ids the child has unlocked. */
+  unlockedParts: string[]
+  /** Sticker ids collected from the daily surprise egg. */
+  stickers: string[]
+  /** Day key of the last hatched egg (one per day). */
+  lastEggDay: string
   /** Stars earned (effort-based XP). */
   xp: number
   /** Total correct word reads (including repeats). */
