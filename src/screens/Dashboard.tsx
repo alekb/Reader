@@ -122,7 +122,7 @@ function ProgressTab() {
       <Card title="How it works">
         <ul className="list-disc space-y-1 pl-5 text-sm text-ink/80">
           <li>Each session (10–15 min) follows the same order: review → robot talk → new sound → read words → heart word → sentences → build words.</li>
-          <li>Sounds are taught in the Letters and Sounds order so real words can be read from the first few letters.</li>
+          <li>Sounds are taught in a proven synthetic-phonics order so real words can be read from the first few letters.</li>
           <li>Every sound and heart word is reviewed on a spaced schedule (1, 2, 4, 7, 14, 30 days). Mistakes bring an item back sooner.</li>
           <li>A new sound is only introduced when review goes well; every 4th session is review-only. Stars reward effort, not accuracy.</li>
           <li>Tip: ask the child to say each sound and word <b>out loud</b>; the app checks by tapping, you check by listening.</li>

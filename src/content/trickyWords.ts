@@ -54,7 +54,7 @@ export const TRICKY_WORDS: TrickyWord[] = [
   t('people', 14, [1, 2, 4, 5], 'Lots of people came.'),
   t('looked', 14, [4, 5], 'She looked at the cake.'),
   t('called', 15, [1, 4, 5], 'He called the boy.'),
-  t('asked', 15, [3, 4], 'Mum asked for tea.'),
+  t('asked', 15, [3, 4], 'Mom asked for tea.'),
   t('could', 15, [1, 2, 3], 'I could eat a pie.'),
   t('would', 16, [1, 2, 3], 'Would you like a toy?'),
   t('should', 16, [2, 3, 4], 'You should draw a bird.'),

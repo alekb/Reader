@@ -8,9 +8,9 @@ export interface Skin {
   id: string
   name: string
   base: CharacterBase
-  /** Main body colour. */
+  /** Main body color. */
   body: string
-  /** Secondary / belly colour. */
+  /** Secondary / belly color. */
   accent: string
   /** Optional accessory drawn on top. */
   accessory?: 'none' | 'crown' | 'glasses' | 'cap' | 'wizard' | 'headphones' | 'bow' | 'pirate' | 'astro' | 'party'
@@ -85,7 +85,7 @@ export function unlockDescription(u: Skin['unlock']): string {
     case 'default': return 'Yours from the start'
     case 'xp': return `Earn ${u.xp} stars`
     case 'group': return `Finish island ${u.group}`
-    case 'streak': return `Practise ${u.days} days in a row`
+    case 'streak': return `Practice ${u.days} days in a row`
     case 'words': return `Read ${u.count} words`
   }
 }

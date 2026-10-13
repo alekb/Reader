@@ -2,7 +2,7 @@
 
 A phonics adventure that teaches a child to read. Built for an 8-year-old late starter who knows part of the alphabet: it runs as a web app (PWA) in any modern browser and as an Android app via Capacitor, speaks every sound, word and sentence, rewards effort with character skins, saves progress to the cloud, and gives parents a dashboard.
 
-The teaching method is systematic synthetic phonics (the approach with the strongest evidence for beginning and struggling readers). The research behind every design decision is in [`docs/RESEARCH.md`](docs/RESEARCH.md).
+All speech and spelling is American English. The teaching method is systematic synthetic phonics (the approach with the strongest evidence for beginning and struggling readers). The research behind every design decision is in [`docs/RESEARCH.md`](docs/RESEARCH.md).
 
 <p>
 <img src="docs/screenshots/home.png" width="180"> <img src="docs/screenshots/new-sound.png" width="180"> <img src="docs/screenshots/read-words.png" width="180"> <img src="docs/screenshots/session-done.png" width="180"> <img src="docs/screenshots/dashboard.png" width="180">
@@ -14,7 +14,7 @@ Every session takes 10–15 minutes and always has the same shape (predictabilit
 
 | Step | What happens | Why |
 |---|---|---|
-| 1. Speed sounds | Hear a sound (or heart word), tap it among look-alikes. Response time is measured. | Spaced review of everything learnt so far; automaticity check |
+| 1. Speed sounds | Hear a sound (or heart word), tap it among look-alikes. Response time is measured. | Spaced review of everything learned so far; automaticity check |
 | 2. Robot talk | The mascot says a word sound by sound (no letters on screen); the child taps the picture. | Oral blending / phonemic awareness |
 | 3. New sound | Big letter card with keyword picture and action; hear the pure sound and the letter name; trace lowercase and uppercase with a finger; find it among distractors; find it inside a word. | See–hear–say–trace multisensory introduction |
 | 4. Read words | Sound buttons for each grapheme, "sound it out", then prove it by tapping the matching picture or the word you hear. One "alien" (nonsense) word per set. | Blending; nonsense words make guessing impossible |
@@ -65,7 +65,9 @@ users/{uid}/recordings/{key}     parent-recorded sound clips (base64)
 
 ## Android app (Capacitor)
 
-The Android project is generated in `android/`. You need Android Studio (or the Android SDK + JDK 17+).
+**No SDK needed:** every push runs the "Android APK" GitHub Actions workflow, which builds a debug APK on GitHub's runners. Open the repo's **Actions** tab → latest run → **Artifacts** → `reader-quest-debug-apk`, copy `app-debug.apk` to the phone and install it (allow "install unknown apps"). To bake cloud sync into that APK, add the `VITE_FIREBASE_*` values as repository secrets (Settings → Secrets and variables → Actions).
+
+To build locally instead, the Android project is in `android/` and you need Android Studio (or the Android SDK + JDK 17+):
 
 ```bash
 npm run build
@@ -80,6 +82,8 @@ Speech on Android uses the native text-to-speech engine through `@capacitor-comm
 Change the app id / name in `capacitor.config.ts` before publishing.
 
 ## Deploying the web version
+
+**GitHub Pages (free, one click):** Settings → Pages → Source: **GitHub Actions**. The "Deploy web app to GitHub Pages" workflow then publishes every push to `main` at `https://<user>.github.io/<repo>/` (add the Firebase secrets as above for cloud sync).
 
 `dist/` is a static site. Any static host works (Firebase Hosting, Netlify, Vercel, GitHub Pages). For Firebase Hosting:
 
@@ -126,7 +130,7 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 ## Testing
 
-- `npm test` runs the engine tests (scheduler maths, group gating, lesson building, nonsense-word safety) and content integrity tests (every sentence only uses sounds and heart words taught by its island; every word's segmentation spells the word).
+- `npm test` runs the engine tests (scheduler math, group gating, lesson building, nonsense-word safety) and content integrity tests (every sentence only uses sounds and heart words taught by its island; every word's segmentation spells the word).
 - `npm run e2e` builds, serves and drives the whole app in headless Chromium (fresh learner and a seeded learner), screenshots every activity into `e2e/shots*/` and fails on any runtime error.
 
 ## Known limitations / ideas

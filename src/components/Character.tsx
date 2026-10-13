@@ -12,7 +12,7 @@ interface Props {
   className?: string
 }
 
-/** The three mascots, drawn in SVG so skins are just colours + accessories. */
+/** The three mascots, drawn in SVG so skins are just colors + accessories. */
 export function Character({ base, skinId, mood = 'idle', size = 160, className = '' }: Props) {
   const skin: Skin = (skinId && SKIN_BY_ID[skinId]) || defaultSkin(base)
   const [blink, setBlink] = useState(false)

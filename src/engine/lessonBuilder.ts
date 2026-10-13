@@ -199,7 +199,7 @@ export function sentenceWords(text: string): string[] {
 const NAMES: Record<string, string[]> = {
   pat: ['p', 'a', 't'], sam: ['s', 'a', 'm'], tim: ['t', 'i', 'm'], tom: ['t', 'o', 'm'], sid: ['s', 'i', 'd'], ted: ['t', 'e', 'd'],
   rick: ['r', 'i', 'ck'], bob: ['b', 'o', 'b'], bill: ['b', 'i', 'll'], jim: ['j', 'i', 'm'], max: ['m', 'a', 'x'], jack: ['j', 'a', 'ck'],
-  chad: ['ch', 'a', 'd'], ping: ['p', 'i', 'ng'], jane: ['j', 'a_e', 'n'], pete: ['p', 'e_e', 't'], mum: ['m', 'u', 'm'], dad: ['d', 'a', 'd'],
+  chad: ['ch', 'a', 'd'], ping: ['p', 'i', 'ng'], jane: ['j', 'a_e', 'n'], pete: ['p', 'e_e', 't'], mom: ['m', 'o', 'm'], dad: ['d', 'a', 'd'],
   kim: ['k', 'i', 'm'], pam: ['p', 'a', 'm'],
 }
 
