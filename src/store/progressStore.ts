@@ -202,6 +202,20 @@ export const useProgress = create<ProgressState>()(
       partialize: (s) => ({ progress: s.progress, sessions: s.sessions, lastSummary: s.lastSummary }),
       onRehydrateStorage: () => (state) => {
         if (state?.progress) {
+          // Skin ids were renamed when the catalogue grew; map old ids to the new ones.
+          const p = state.progress
+          const rename = (id: string) =>
+            id
+              .replace(/-(lime|fire|slime)$/, '-stars60')
+              .replace(/-(cap|bow)$/, '-island1')
+              .replace(/-glasses$/, '-island2')
+              .replace(/-(headphones|pirate)$/, '-island4')
+              .replace(/-(astro|ice)$/, '-island7')
+              .replace(/-wizard$/, '-island14')
+              .replace(/-(gold|crown)$/, '-words100')
+              .replace(/-streak$/, '-streak7')
+          p.unlockedSkins = [...new Set(p.unlockedSkins.map(rename))]
+          p.skinId = rename(p.skinId)
           setSfxEnabled(state.progress.settings.sfx)
           setVoiceRate(state.progress.settings.voiceRate)
         }

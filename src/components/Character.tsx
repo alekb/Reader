@@ -42,6 +42,7 @@ export function Character({ base, skinId, mood = 'idle', size = 160, className =
       aria-label={`${base} mascot`}
       style={{ overflow: 'visible' }}
     >
+      <BackAccessory kind={skin.accessory ?? 'none'} base={base} skin={skin} />
       {base === 'robot' && <Robot skin={skin} mood={mood} blink={blink} />}
       {base === 'dragon' && <Dragon skin={skin} mood={mood} blink={blink} />}
       {base === 'monster' && <Monster skin={skin} mood={mood} blink={blink} />}
@@ -187,6 +188,43 @@ function Monster({ skin, mood, blink }: { skin: Skin; mood: Mood; blink: boolean
   )
 }
 
+/** Accessories drawn behind the body (capes, backpacks, halos). */
+function BackAccessory({ kind, base, skin }: { kind: NonNullable<Skin['accessory']>; base: CharacterBase; skin: Skin }) {
+  const top = base === 'robot' ? 38 : base === 'dragon' ? 44 : 46
+  switch (kind) {
+    case 'cape':
+      return (
+        <g>
+          <path d="M60 110 q -30 60 -20 86 h 120 q 10 -26 -20 -86 z" fill="#dc2626" stroke="#7f1d1d" strokeWidth={3} strokeLinejoin="round" />
+          <path d="M70 120 q -16 40 -10 70 M130 120 q 16 40 10 70" fill="none" stroke="#991b1b" strokeWidth={2} opacity={0.6} />
+        </g>
+      )
+    case 'backpack':
+      return (
+        <g>
+          <rect x={30} y={116} width={38} height={54} rx={12} fill="#16a34a" stroke="#14532d" strokeWidth={3} />
+          <rect x={38} y={126} width={22} height={16} rx={5} fill="#86efac" stroke="#14532d" strokeWidth={2} />
+          <rect x={132} y={116} width={38} height={54} rx={12} fill="#16a34a" stroke="#14532d" strokeWidth={3} />
+          <rect x={140} y={126} width={22} height={16} rx={5} fill="#86efac" stroke="#14532d" strokeWidth={2} />
+        </g>
+      )
+    case 'halo':
+      return (
+        <g>
+          <ellipse cx={100} cy={top - 18} rx={34} ry={9} fill="none" stroke="#fde047" strokeWidth={7} />
+          <ellipse cx={100} cy={top - 18} rx={34} ry={9} fill="none" stroke="#facc15" strokeWidth={3} />
+          {[[40, 70], [160, 70], [36, 150], [164, 150], [100, 10]].map(([x, y], i) => (
+            <text key={i} x={x - 8} y={y} fontSize={16} fill={skin.accent === '#fefce8' ? '#f59e0b' : '#fde047'} stroke="#f59e0b" strokeWidth={0.5}>
+              ✦
+            </text>
+          ))}
+        </g>
+      )
+    default:
+      return null
+  }
+}
+
 function Accessory({ kind, base }: { kind: NonNullable<Skin['accessory']>; base: CharacterBase }) {
   const top = base === 'robot' ? 38 : base === 'dragon' ? 44 : 46
   const eyeY = base === 'monster' ? 88 : 74
@@ -266,6 +304,119 @@ function Accessory({ kind, base }: { kind: NonNullable<Skin['accessory']>; base:
           <path d={`M84 ${top + 2} l 16 -46 l 16 46 z`} fill="#f43f5e" stroke="#881337" strokeWidth={3} strokeLinejoin="round" />
           <path d={`M88 ${top - 10} h 24 M92 ${top - 24} h 16`} stroke="#fde68a" strokeWidth={4} />
           <circle cx={100} cy={top - 46} r={6} fill="#fbbf24" />
+        </g>
+      )
+    case 'scarf':
+      return (
+        <g>
+          <path d={`M62 ${base === 'monster' ? 150 : 122} q 38 18 76 0 v 12 q -38 18 -76 0 z`} fill="#ef4444" stroke="#991b1b" strokeWidth={3} strokeLinejoin="round" />
+          <path d={`M126 ${base === 'monster' ? 158 : 130} l 14 26 l -14 4 z`} fill="#ef4444" stroke="#991b1b" strokeWidth={3} strokeLinejoin="round" />
+          <path d={`M66 ${base === 'monster' ? 156 : 128} h 68 M66 ${base === 'monster' ? 162 : 134} h 68`} stroke="#fde68a" strokeWidth={2} />
+        </g>
+      )
+    case 'flower':
+      return (
+        <g transform={`translate(136 ${top - 2})`}>
+          {[0, 60, 120, 180, 240, 300].map((a) => (
+            <ellipse key={a} cx={0} cy={-11} rx={6} ry={10} fill="#f472b6" stroke="#9d174d" strokeWidth={2} transform={`rotate(${a})`} />
+          ))}
+          <circle r={6} fill="#fde047" stroke="#9d174d" strokeWidth={2} />
+        </g>
+      )
+    case 'bandana':
+      return (
+        <g>
+          <path d={`M48 ${top + 10} q 52 -30 104 0 l 0 10 q -52 -22 -104 0 z`} fill="#dc2626" stroke="#7f1d1d" strokeWidth={3} strokeLinejoin="round" />
+          <path d={`M150 ${top + 12} l 22 -10 l -6 16 l 10 10 l -24 -8 z`} fill="#dc2626" stroke="#7f1d1d" strokeWidth={3} strokeLinejoin="round" />
+          {[60, 80, 100, 120, 140].map((x) => (
+            <circle key={x} cx={x} cy={top + 10} r={2.5} fill="white" />
+          ))}
+        </g>
+      )
+    case 'shield':
+      return (
+        <g transform="translate(142 128)">
+          <path d="M0 -24 l 24 8 v 20 q 0 18 -24 28 q -24 -10 -24 -28 v -20 z" fill="#3b82f6" stroke="#1e3a8a" strokeWidth={3} strokeLinejoin="round" />
+          <path d="M0 -14 l 14 5 v 12 q 0 10 -14 17 q -14 -7 -14 -17 v -12 z" fill="#fde047" stroke="#1e3a8a" strokeWidth={2} />
+          <text x={-6} y={8} fontSize={16} fill="#1e3a8a">★</text>
+        </g>
+      )
+    case 'sunglasses':
+      return (
+        <g fill="#111827" stroke="#111827" strokeWidth={3}>
+          <rect x={62} y={eyeY - 12} width={34} height={24} rx={8} />
+          <rect x={104} y={eyeY - 12} width={34} height={24} rx={8} />
+          <line x1={96} y1={eyeY - 4} x2={104} y2={eyeY - 4} />
+          <line x1={62} y1={eyeY - 6} x2={50} y2={eyeY - 10} />
+          <line x1={138} y1={eyeY - 6} x2={150} y2={eyeY - 10} />
+          <path d={`M68 ${eyeY - 6} h 14`} stroke="#9ca3af" strokeWidth={2} />
+          <path d={`M110 ${eyeY - 6} h 14`} stroke="#9ca3af" strokeWidth={2} />
+        </g>
+      )
+    case 'medal':
+      return (
+        <g transform={`translate(100 ${base === 'monster' ? 150 : 126})`}>
+          <path d="M-14 -8 l 8 22 h 12 l 8 -22 z" fill="#2563eb" stroke="#1e3a8a" strokeWidth={2} />
+          <circle cy={22} r={13} fill="#fbbf24" stroke="#92400e" strokeWidth={3} />
+          <text x={-7} y={28} fontSize={16} fill="#92400e">1</text>
+        </g>
+      )
+    case 'cape':
+    case 'backpack':
+    case 'halo':
+    case 'scarf':
+      return (
+        <g>
+          <path d={`M62 ${base === 'monster' ? 150 : 122} q 38 18 76 0 v 12 q -38 18 -76 0 z`} fill="#ef4444" stroke="#991b1b" strokeWidth={3} strokeLinejoin="round" />
+          <path d={`M126 ${base === 'monster' ? 158 : 130} l 14 26 l -14 4 z`} fill="#ef4444" stroke="#991b1b" strokeWidth={3} strokeLinejoin="round" />
+          <path d={`M66 ${base === 'monster' ? 156 : 128} h 68 M66 ${base === 'monster' ? 162 : 134} h 68`} stroke="#fde68a" strokeWidth={2} />
+        </g>
+      )
+    case 'flower':
+      return (
+        <g transform={`translate(136 ${top - 2})`}>
+          {[0, 60, 120, 180, 240, 300].map((a) => (
+            <ellipse key={a} cx={0} cy={-11} rx={6} ry={10} fill="#f472b6" stroke="#9d174d" strokeWidth={2} transform={`rotate(${a})`} />
+          ))}
+          <circle r={6} fill="#fde047" stroke="#9d174d" strokeWidth={2} />
+        </g>
+      )
+    case 'bandana':
+      return (
+        <g>
+          <path d={`M48 ${top + 10} q 52 -30 104 0 l 0 10 q -52 -22 -104 0 z`} fill="#dc2626" stroke="#7f1d1d" strokeWidth={3} strokeLinejoin="round" />
+          <path d={`M150 ${top + 12} l 22 -10 l -6 16 l 10 10 l -24 -8 z`} fill="#dc2626" stroke="#7f1d1d" strokeWidth={3} strokeLinejoin="round" />
+          {[60, 80, 100, 120, 140].map((x) => (
+            <circle key={x} cx={x} cy={top + 10} r={2.5} fill="white" />
+          ))}
+        </g>
+      )
+    case 'shield':
+      return (
+        <g transform="translate(142 128)">
+          <path d="M0 -24 l 24 8 v 20 q 0 18 -24 28 q -24 -10 -24 -28 v -20 z" fill="#3b82f6" stroke="#1e3a8a" strokeWidth={3} strokeLinejoin="round" />
+          <path d="M0 -14 l 14 5 v 12 q 0 10 -14 17 q -14 -7 -14 -17 v -12 z" fill="#fde047" stroke="#1e3a8a" strokeWidth={2} />
+          <text x={-6} y={8} fontSize={16} fill="#1e3a8a">★</text>
+        </g>
+      )
+    case 'sunglasses':
+      return (
+        <g fill="#111827" stroke="#111827" strokeWidth={3}>
+          <rect x={62} y={eyeY - 12} width={34} height={24} rx={8} />
+          <rect x={104} y={eyeY - 12} width={34} height={24} rx={8} />
+          <line x1={96} y1={eyeY - 4} x2={104} y2={eyeY - 4} />
+          <line x1={62} y1={eyeY - 6} x2={50} y2={eyeY - 10} />
+          <line x1={138} y1={eyeY - 6} x2={150} y2={eyeY - 10} />
+          <path d={`M68 ${eyeY - 6} h 14`} stroke="#9ca3af" strokeWidth={2} />
+          <path d={`M110 ${eyeY - 6} h 14`} stroke="#9ca3af" strokeWidth={2} />
+        </g>
+      )
+    case 'medal':
+      return (
+        <g transform={`translate(100 ${base === 'monster' ? 150 : 126})`}>
+          <path d="M-14 -8 l 8 22 h 12 l 8 -22 z" fill="#2563eb" stroke="#1e3a8a" strokeWidth={2} />
+          <circle cy={22} r={13} fill="#fbbf24" stroke="#92400e" strokeWidth={3} />
+          <text x={-7} y={28} fontSize={16} fill="#92400e">1</text>
         </g>
       )
     default:
