@@ -1,10 +1,11 @@
 name: Deploy web app to GitHub Pages
 
-# Enable once in the repo: Settings → Pages → Source: "GitHub Actions".
+# The first run enables Pages automatically; if that fails, enable it once under
+# Settings → Pages → Source: "GitHub Actions".
 # The app is then served at https://<user>.github.io/<repo>/ and installable as a PWA.
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'claude/**']
   workflow_dispatch:
 
 permissions:
@@ -39,6 +40,9 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
       - uses: actions/configure-pages@v5
+        with:
+          # Creates the Pages site on first run so no manual setup is needed.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
