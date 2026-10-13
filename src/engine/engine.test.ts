@@ -1,0 +1,162 @@
+import { describe, it, expect } from 'vitest'
+import { GPCS, GROUPS, GPC_BY_ID } from '../content/gpcs'
+import { WORDS, letterSegments } from '../content/words'
+import { SENTENCES } from '../content/sentences'
+import { TRICKY_WORDS } from '../content/trickyWords'
+import { SKINS } from '../content/characters'
+import { applyAnswer, newItem, masteryOf, bumpStreak, currentStreak, DAY_MS } from './scheduler'
+import { buildLesson, sentenceWords, wordGpcs } from './lessonBuilder'
+import { makeNonsenseWord } from './nonsense'
+import { advanceGroups, isGroupComplete, newItemPolicy, nextGpcToIntroduce } from './curriculum'
+import { createProgress } from './progress'
+import type { Progress } from './types'
+
+function seeded(seed = 1) {
+  let s = seed
+  return () => {
+    s = (s * 16807) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
+
+describe('content integrity', () => {
+  it('every group GPC exists and every GPC is in exactly one group', () => {
+    const seen = new Map<string, number>()
+    for (const g of GROUPS) for (const id of g.gpcIds) {
+      expect(GPC_BY_ID[id], id).toBeDefined()
+      seen.set(id, (seen.get(id) ?? 0) + 1)
+    }
+    for (const gpc of GPCS) expect(seen.get(gpc.id), gpc.id).toBe(1)
+  })
+  it('words are spelled by their segments', () => {
+    for (const w of WORDS) {
+      const segs = letterSegments(w)
+      expect(segs.length, w.word).toBe(w.word.length)
+    }
+    expect(WORDS.find((w) => w.word === 'cake')?.gpcs).toEqual(['c', 'a_e', 'k'])
+    expect(WORDS.find((w) => w.word === 'duck')?.group).toBe(4)
+    expect(WORDS.find((w) => w.word === 'frog')?.group).toBe(13)
+  })
+  it('sentences only use decodable or tricky words', () => {
+    const trickySet = new Set(TRICKY_WORDS.map((t) => t.word.toLowerCase()))
+    for (const s of SENTENCES) {
+      for (const w of sentenceWords(s.text)) {
+        if (trickySet.has(w)) continue
+        expect(wordGpcs(w), `${w} in "${s.text}"`).not.toBeNull()
+      }
+    }
+  })
+  it('sentences respect their group (all GPCs taught by then)', () => {
+    const groupOfGpc = new Map<string, number>()
+    for (const g of GROUPS) for (const id of g.gpcIds) groupOfGpc.set(id, g.id)
+    const trickyGroup = new Map(TRICKY_WORDS.map((t) => [t.word.toLowerCase(), t.group]))
+    for (const s of SENTENCES) {
+      for (const w of sentenceWords(s.text)) {
+        if (trickyGroup.has(w)) {
+          expect(trickyGroup.get(w)!, `${w} in "${s.text}"`).toBeLessThanOrEqual(s.group)
+          continue
+        }
+        for (const id of wordGpcs(w) ?? []) {
+          expect(groupOfGpc.get(id)!, `${id} (${w}) in "${s.text}"`).toBeLessThanOrEqual(s.group)
+        }
+      }
+    }
+  })
+  it('skins have a default per character', () => {
+    for (const base of ['robot', 'dragon', 'monster']) {
+      expect(SKINS.filter((s) => s.base === base && s.unlock.type === 'default').length).toBe(1)
+    }
+  })
+})
+
+describe('scheduler', () => {
+  it('promotes on fast correct, demotes on wrong', () => {
+    const now = Date.now()
+    let it1 = newItem(now)
+    it1 = applyAnswer(it1, true, 1000, now, true)
+    expect(it1.box).toBe(1)
+    expect(it1.due).toBeGreaterThan(now)
+    it1 = applyAnswer(it1, true, 1000, now + DAY_MS, true)
+    expect(it1.box).toBe(2)
+    it1 = applyAnswer(it1, false, 1000, now + 2 * DAY_MS, true)
+    expect(it1.box).toBe(1)
+    expect(it1.due).toBe(now + 2 * DAY_MS)
+    expect(it1.correctStreak).toBe(0)
+  })
+  it('slow correct answers do not promote beyond box 1', () => {
+    const now = Date.now()
+    let it1 = applyAnswer(newItem(now), true, 1000, now, true)
+    it1 = applyAnswer(it1, true, 5000, now + DAY_MS, true)
+    expect(it1.box).toBe(1)
+  })
+  it('mastery requires 3 streak days and box >= 3', () => {
+    const now = Date.now()
+    let it1 = newItem(now)
+    for (let d = 0; d < 4; d++) it1 = applyAnswer(it1, true, 800, now + d * DAY_MS, true)
+    expect(masteryOf(it1)).toBe('mastered')
+  })
+  it('streak counts consecutive days', () => {
+    const now = Date.now()
+    let s = bumpStreak({ count: 0, lastDay: '' }, now)
+    expect(s.count).toBe(1)
+    s = bumpStreak(s, now)
+    expect(s.count).toBe(1)
+    s = bumpStreak(s, now + DAY_MS)
+    expect(s.count).toBe(2)
+    expect(currentStreak(s, now + 3 * DAY_MS)).toBe(0)
+  })
+})
+
+describe('lesson builder', () => {
+  it('first lesson introduces s and has a close step', () => {
+    const p = createProgress('Kid', 'robot', Date.now())
+    const lesson = buildLesson(p, { now: Date.now(), rnd: seeded(3) })
+    expect(lesson.newGpcIds).toEqual(['s', 'a'])
+    expect(lesson.steps[lesson.steps.length - 1].kind).toBe('close')
+    expect(lesson.steps.some((s) => s.kind === 'newSound')).toBe(true)
+  })
+  it('blends words after a few sounds are known', () => {
+    const now = Date.now()
+    let p = createProgress('Kid', 'robot', now)
+    for (const id of ['s', 'a', 't']) p.gpcs[id] = applyAnswer(newItem(now), true, 800, now, false)
+    p.sessionsCompleted = 3 // not consolidation? 3 % 4 === 3 -> consolidation
+    let lesson = buildLesson(p, { now, rnd: seeded(5) })
+    expect(lesson.consolidation).toBe(true)
+    expect(lesson.newGpcIds).toEqual([])
+    p = { ...p, sessionsCompleted: 4 }
+    lesson = buildLesson(p, { now, rnd: seeded(5) })
+    expect(lesson.newGpcIds).toEqual(['p'])
+    const blend = lesson.steps.find((s) => s.kind === 'blend')
+    expect(blend && blend.kind === 'blend' && blend.words.length).toBeGreaterThan(0)
+  })
+  it('does not introduce new sounds after a bad session', () => {
+    const now = Date.now()
+    const p: Progress = { ...createProgress('Kid', 'robot', now), lastSessionAccuracy: 0.5 }
+    p.gpcs['s'] = applyAnswer(newItem(now), true, 800, now, false)
+    expect(newItemPolicy(p, now).allowNewGpc).toBe(false)
+  })
+  it('advances groups when all GPCs are secure', () => {
+    const now = Date.now()
+    let p = createProgress('Kid', 'robot', now)
+    for (const id of ['s', 'a', 't', 'p']) {
+      let it1 = applyAnswer(newItem(now), true, 800, now, true)
+      it1 = applyAnswer(it1, true, 800, now + DAY_MS, true)
+      p.gpcs[id] = it1
+    }
+    expect(isGroupComplete(p, 1)).toBe(true)
+    p = advanceGroups(p)
+    expect(p.currentGroup).toBe(2)
+    expect(nextGpcToIntroduce(p)).toBe('i')
+  })
+})
+
+describe('nonsense words', () => {
+  it('never returns a real word from the bank', () => {
+    const rnd = seeded(9)
+    for (let i = 0; i < 50; i++) {
+      const w = makeNonsenseWord(['s', 'a', 't', 'p', 'i', 'n', 'm', 'd'], rnd)
+      expect(w).not.toBeNull()
+      expect(WORDS.find((x) => x.word === w!.word)).toBeUndefined()
+    }
+  })
+})

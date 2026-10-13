@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Reader Quest</string>
+    <string name="title_activity_main">Reader Quest</string>
+    <string name="package_name">com.readerquest.app</string>
+    <string name="custom_url_scheme">com.readerquest.app</string>
+</resources>
