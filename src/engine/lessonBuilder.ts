@@ -150,10 +150,13 @@ export function buildLesson(p: Progress, opts: BuildOptions): Lesson {
   let newTricky: string | null = null
   const introduceTricky = policy.allowNewTricky && !(newGpcId && p.sessionsCompleted % 2 === 0) && p.sessionsCompleted % 2 === 1
   if (introduceTricky || (!newGpcId && policy.allowNewTricky)) newTricky = nextTrickyToIntroduce(p)
-  if (newTricky) steps.push({ kind: 'trickyIntro', word: TRICKY_BY_WORD[newTricky] })
+  const trickyEntry = newTricky ? TRICKY_BY_WORD[newTricky.toLowerCase()] : undefined
+  if (!trickyEntry) newTricky = null
+  else steps.push({ kind: 'trickyIntro', word: trickyEntry })
 
   // ---- 6. Sentences ----
-  const knownTricky = new Set([...Object.keys(p.tricky), ...(newTricky ? [newTricky] : [])])
+  // Sentence tokens are lowercased, so compare heart words lowercased too ("I").
+  const knownTricky = new Set([...Object.keys(p.tricky), ...(newTricky ? [newTricky] : [])].map((w) => w.toLowerCase()))
   const knownSet = new Set(poolIds)
   const candidateSentences = sentencesThroughGroup(p.currentGroup).filter((s) => sentenceIsReadable(s, knownSet, knownTricky, allowBlends))
   if (candidateSentences.length) {

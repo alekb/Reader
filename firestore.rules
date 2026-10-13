@@ -1,9 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each parent account owns everything under users/{uid}.
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // One document per parent account holding the child's progress.
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['progress', 'updatedAt', 'resetAt', 'email'])
+        && (!('progress' in request.resource.data) || request.resource.data.progress is map);
+
+      // One document per learning session (small logs).
+      match /sessions/{sessionId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.id == sessionId
+          && request.resource.data.keys().size() < 30;
+      }
+
+      // Parent voice recordings of the letter sounds (short clips, base64).
+      match /recordings/{key} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['key', 'b64', 'type', 'updatedAt'])
+          && request.resource.data.b64 is string
+          && request.resource.data.b64.size() < 400000;
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

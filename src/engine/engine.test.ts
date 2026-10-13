@@ -11,7 +11,7 @@ import { applyAnswer, newItem, masteryOf, bumpStreak, currentStreak, DAY_MS } fr
 import { buildLesson, sentenceWords, wordGpcs } from './lessonBuilder'
 import { makeNonsenseWord } from './nonsense'
 import { advanceGroups, isGroupComplete, newItemPolicy, nextGpcToIntroduce } from './curriculum'
-import { createProgress } from './progress'
+import { applyResult, createProgress, introduce } from './progress'
 import type { Progress } from './types'
 
 function seeded(seed = 1) {
@@ -212,5 +212,43 @@ describe('parts, levels and stickers', () => {
   it('sticker picks prefer unowned stickers', () => {
     const owned = STICKERS.slice(0, -1).map((s) => s.id)
     expect(pickSticker(owned, () => 0.5).id).toBe(STICKERS[STICKERS.length - 1].id)
+  })
+})
+
+describe('whole-curriculum simulation', () => {
+  it('a learner who answers everything reaches the end without a broken lesson', () => {
+    const DAY = 86400000
+    let now = Date.UTC(2026, 0, 1, 12)
+    let p = createProgress('Kid', 'robot', now)
+    let finished = false
+    for (let day = 0; day < 200 && !finished; day++) {
+      const lesson = buildLesson(p, { now, rnd: seeded(day + 1) })
+      for (const step of lesson.steps) {
+        if (step.kind === 'trickyIntro') expect(step.word, `day ${day} group ${p.currentGroup}`).toBeDefined()
+        if (step.kind === 'newSound') p = applyResult(introduce(p, 'gpc', step.gpcId, now), { kind: 'gpc', id: step.gpcId, correct: true, ms: 500 }, now)
+        if (step.kind === 'trickyIntro') p = applyResult(introduce(p, 'tricky', step.word.word, now), { kind: 'tricky', id: step.word.word, correct: true, ms: 500 }, now)
+        if (step.kind === 'speedSounds') for (const it2 of step.items) p = applyResult(p, { kind: it2.type, id: it2.id, correct: true, ms: 500, scheduled: true }, now)
+        if (step.kind === 'blend' || step.kind === 'build') for (const w of step.words) p = applyResult(p, { kind: 'word', id: w.word, correct: true, ms: 500, group: p.currentGroup, nonsense: w.group === 0 }, now)
+      }
+      p = advanceGroups({ ...p, sessionsCompleted: p.sessionsCompleted + 1, lastSessionAccuracy: 1 })
+      finished = p.completedGroups.length === GROUPS.length && Object.keys(p.tricky).length === TRICKY_WORDS.length
+      now += DAY
+    }
+    expect(p.completedGroups.length).toBe(GROUPS.length)
+    expect(Object.keys(p.tricky).length).toBe(TRICKY_WORDS.length)
+    expect(newItemPolicy(p, now).reason).toMatch(/Every sound/)
+  })
+  it('sentences containing the heart word "I" can be chosen', () => {
+    const now = Date.now()
+    const p = createProgress('Kid', 'robot', now)
+    for (const id of ['s', 'a', 't', 'p', 'i', 'n', 'm', 'd', 'g', 'o', 'c', 'k']) p.gpcs[id] = applyAnswer(newItem(now), true, 500, now, false)
+    for (const w of ['the', 'to', 'I']) p.tricky[w] = newItem(now)
+    p.currentGroup = 3
+    const seen = new Set<string>()
+    for (let i = 1; i < 60; i++) {
+      const l = buildLesson(p, { now, rnd: seeded(i) })
+      for (const s of l.steps) if (s.kind === 'sentences') s.sentences.forEach((x) => seen.add(x.text))
+    }
+    expect([...seen].some((t) => /\bI\b/.test(t))).toBe(true)
   })
 })

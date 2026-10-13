@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { CharacterBase } from '../content/characters'
 import { PAINT_BY_ID, PART_BY_ID, levelFor } from '../content/parts'
 import type { Slot } from '../content/parts'
@@ -238,6 +238,30 @@ export const useProgress = create<ProgressState>()(
     {
       name: 'reader-quest-progress',
       version: 3,
+      // Never let a full or blocked localStorage crash the app.
+      storage: createJSONStorage(() => ({
+        getItem: (k: string) => {
+          try {
+            return localStorage.getItem(k)
+          } catch {
+            return null
+          }
+        },
+        setItem: (k: string, v: string) => {
+          try {
+            localStorage.setItem(k, v)
+          } catch {
+            /* quota exceeded or storage blocked: keep running in memory */
+          }
+        },
+        removeItem: (k: string) => {
+          try {
+            localStorage.removeItem(k)
+          } catch {
+            /* ignore */
+          }
+        },
+      })),
       partialize: (s) => ({ progress: s.progress, sessions: s.sessions, lastSummary: s.lastSummary }),
       migrate: (persisted) => {
         const st = persisted as { progress?: unknown; sessions?: SessionLog[]; lastSummary?: SessionSummary | null }

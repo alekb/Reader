@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { GPC_BY_ID, GROUPS } from '../content/gpcs'
 import { LEVEL_NAMES, PAINT_BY_ID, PART_BY_ID, levelFor } from '../content/parts'
 import { STICKER_BY_ID } from '../content/stickers'
@@ -39,10 +39,7 @@ export function SessionComplete() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (!summary || !progress) {
-    nav('/')
-    return null
-  }
+  if (!summary || !progress) return <Navigate to="/" replace />
   const { log } = summary
   const level = levelFor(progress.xp)
   const newGroups = summary.completedGroups.map((id) => GROUPS.find((g) => g.id === id)!).filter(Boolean)

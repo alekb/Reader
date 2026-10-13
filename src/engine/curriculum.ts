@@ -2,7 +2,7 @@
  * Curriculum logic: what the child has, what comes next, and when a group
  * (island) is complete. Pure functions over the Progress object.
  */
-import { GROUPS, GPC_BY_ID, gpcsThroughGroup } from '../content/gpcs'
+import { GROUPS, GPCS, GPC_BY_ID, gpcsThroughGroup } from '../content/gpcs'
 import { TRICKY_WORDS } from '../content/trickyWords'
 import { UNLOCKABLES } from '../content/parts'
 import type { Unlock } from '../content/parts'
@@ -65,6 +65,10 @@ export function newItemPolicy(p: Progress, now: number): NewItemPolicy {
   if (p.lastSessionAccuracy < 0.7) return { allowNewGpc: false, allowNewTricky: false, consolidation: false, reason: 'Last session accuracy was below 70%.' }
   if (fragileCount(p.gpcs, now) > 2) return { allowNewGpc: false, allowNewTricky: true, consolidation: false, reason: 'More than two sounds are still fragile.' }
   const trickyFragile = fragileCount(p.tricky, now) > 2
+  const everythingTaught = GPCS.every((g) => p.gpcs[g.id]) && TRICKY_WORDS.every((t) => p.tricky[t.word])
+  if (everythingTaught) {
+    return { allowNewGpc: false, allowNewTricky: false, consolidation: false, reason: 'Every sound and heart word has been taught: sessions now review and build reading fluency.' }
+  }
   return { allowNewGpc: true, allowNewTricky: !trickyFragile, consolidation: false, reason: 'Ready for something new.' }
 }
 

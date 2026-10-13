@@ -5,7 +5,7 @@
  *   users/{uid}/recordings/{key}     -> { b64, type, updatedAt }
  * Local data is the source of truth while offline; on sign-in we merge.
  */
-import { collection, doc, getDoc, getDocs, setDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocFromServer, getDocs, setDoc, writeBatch } from 'firebase/firestore'
 import type { Firestore } from 'firebase/firestore'
 import type { Progress, SessionLog } from '../engine/types'
 import type { ItemState } from '../engine/types'
@@ -63,16 +63,28 @@ export function mergeSessions(local: SessionLog[], remote: SessionLog[]): Sessio
   return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt)
 }
 
-export async function fetchRemote(db: Firestore, uid: string): Promise<{ progress: Progress | null; sessions: SessionLog[] }> {
+export async function fetchRemote(db: Firestore, uid: string): Promise<{ progress: Progress | null; sessions: SessionLog[]; resetAt: number }> {
   const snap = await getDoc(doc(db, 'users', uid))
-  const progress = snap.exists() ? migrateProgress(snap.data().progress) : null
+  const data = snap.exists() ? snap.data() : {}
+  const progress = data.progress ? migrateProgress(data.progress) : null
   const sessSnap = await getDocs(collection(db, 'users', uid, 'sessions'))
   const sessions = sessSnap.docs.map((d) => d.data() as SessionLog)
-  return { progress, sessions }
+  return { progress, sessions, resetAt: Number(data.resetAt ?? 0) }
+}
+
+/** When the progress was last reset from any device (0 = never). Reads the server, not the cache. */
+export async function fetchResetAt(db: Firestore, uid: string): Promise<number> {
+  const snap = await getDocFromServer(doc(db, 'users', uid))
+  return snap.exists() ? Number(snap.data().resetAt ?? 0) : 0
+}
+
+/** Throws unless the server is reachable right now (used before destructive operations). */
+export async function requireServer(db: Firestore, uid: string): Promise<void> {
+  await getDocFromServer(doc(db, 'users', uid))
 }
 
 export async function pushProgress(db: Firestore, uid: string, progress: Progress): Promise<void> {
-  await setDoc(doc(db, 'users', uid), { progress, updatedAt: progress.updatedAt, email: null }, { merge: true })
+  await setDoc(doc(db, 'users', uid), { progress, updatedAt: progress.updatedAt }, { merge: true })
 }
 
 export async function pushSessions(db: Firestore, uid: string, sessions: SessionLog[]): Promise<void> {
@@ -91,8 +103,43 @@ export interface RemoteRecording {
   updatedAt: number
 }
 
+function recordingDocId(key: string): string {
+  return key.replace(/[/:]/g, '_')
+}
+
 export async function pushRecording(db: Firestore, uid: string, rec: RemoteRecording): Promise<void> {
-  await setDoc(doc(db, 'users', uid, 'recordings', rec.key.replace(/[/:]/g, '_')), rec)
+  await setDoc(doc(db, 'users', uid, 'recordings', recordingDocId(rec.key)), rec)
+}
+
+export async function deleteRemoteRecording(db: Firestore, uid: string, key: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', uid, 'recordings', recordingDocId(key)))
+}
+
+/** Delete every document in users/{uid}/{name}. */
+async function deleteSubcollection(db: Firestore, uid: string, name: string): Promise<void> {
+  const snap = await getDocs(collection(db, 'users', uid, name))
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const d of snap.docs.slice(i, i + 400)) batch.delete(d.ref)
+    await batch.commit()
+  }
+}
+
+/**
+ * Remove the child's progress and session history from the cloud (recordings are kept).
+ * A reset marker stays behind so other signed-in devices drop their older local copy
+ * instead of uploading it again.
+ */
+export async function wipeCloudProgress(db: Firestore, uid: string, resetAt: number): Promise<void> {
+  await setDoc(doc(db, 'users', uid), { resetAt })
+  await deleteSubcollection(db, uid, 'sessions')
+}
+
+/** Remove everything stored for this account. */
+export async function deleteAllCloudData(db: Firestore, uid: string): Promise<void> {
+  await deleteSubcollection(db, uid, 'recordings')
+  await deleteSubcollection(db, uid, 'sessions')
+  await deleteDoc(doc(db, 'users', uid))
 }
 
 export async function fetchRecordings(db: Firestore, uid: string): Promise<RemoteRecording[]> {

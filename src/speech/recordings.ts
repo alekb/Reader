@@ -111,6 +111,11 @@ export async function deleteRecording(key: string): Promise<void> {
   knownKeys.delete(key)
 }
 
+/** Remove every recording from this device. */
+export async function clearRecordings(): Promise<void> {
+  for (const key of await listRecordingKeys()) await deleteRecording(key).catch(() => {})
+}
+
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()

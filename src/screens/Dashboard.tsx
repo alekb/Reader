@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { RecordSounds } from '../components/RecordSounds'
 import { Screen, TopBar } from '../components/ui'
 import { GPCS, GPC_BY_ID, GROUPS } from '../content/gpcs'
@@ -26,13 +26,15 @@ export function Dashboard() {
   const progress = useProgress((s) => s.progress)
   const sessions = useProgress((s) => s.sessions)
   const [tab, setTab] = useState<Tab>('progress')
-  if (!isParentUnlocked()) {
-    nav('/parent', { replace: true })
-    return null
-  }
+  if (!isParentUnlocked()) return <Navigate to="/parent" replace />
   if (!progress) {
-    nav('/', { replace: true })
-    return null
+    // No child profile on this device yet (fresh install): only offer sign-in to restore.
+    return (
+      <Screen className="gap-3 px-4 pb-10 text-base">
+        <TopBar title="Restore progress" onBack={() => nav('/')} />
+        <AccountTab />
+      </Screen>
+    )
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -317,7 +319,8 @@ function SoundsTab() {
 
 function AccountTab() {
   const sync = useSync()
-  const progress = useProgress((s) => s.progress)!
+  const progress = useProgress((s) => s.progress)
+  const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -328,7 +331,7 @@ function AccountTab() {
     return (
       <Card title="Cloud sync">
         <div className="text-ink/80">
-          Cloud sync is not configured in this build, so progress is saved on this device only. To enable it, create a free Firebase project and add its keys to <code>.env</code> (see README).
+          Cloud backup is not available in this version of the app. Progress is saved on this device.
         </div>
       </Card>
     )
@@ -359,7 +362,7 @@ function AccountTab() {
             <div className="text-sm text-ink/70">
               Status: {sync.status === 'syncing' ? 'syncing…' : sync.status === 'synced' ? `synced ${sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : ''}` : sync.status === 'error' ? `error: ${sync.error}` : sync.status}
             </div>
-            <div className="text-xs text-ink/60">Progress for {progress.childName} is saved automatically. Reinstall the app, sign in, and everything comes back.</div>
+            <div className="text-xs text-ink/60">Progress{progress ? ` for ${progress.childName}` : ''} is saved automatically. Reinstall the app, sign in, and everything comes back.</div>
             <div className="flex gap-2">
               <button onClick={() => sync.pull()} className="btn btn-secondary flex-1 text-base" disabled={sync.status === 'syncing'}>
                 ⟳ Restore from cloud
@@ -368,9 +371,19 @@ function AccountTab() {
                 ↑ Save now
               </button>
             </div>
-            <button onClick={() => sync.signOut()} className="btn btn-warn text-base">
-              Sign out
+            <button onClick={() => sync.signOut()} className="btn btn-secondary text-base">
+              Sign out (keep progress on this device)
             </button>
+            <button
+              onClick={async () => {
+                await sync.signOut({ clearDevice: true })
+                nav('/', { replace: true })
+              }}
+              className="btn btn-warn text-base"
+            >
+              Sign out and remove from this device
+            </button>
+            <DeleteAccount />
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -407,15 +420,73 @@ function AccountTab() {
   )
 }
 
+function DeleteAccount() {
+  const deleteAccount = useSync((s) => s.deleteAccount)
+  const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-2 text-sm font-bold text-rose-700 underline">
+        Delete account and all data…
+      </button>
+    )
+  }
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-2xl border-2 border-rose-200 bg-rose-50 p-3">
+      <div className="text-sm font-bold text-rose-800">
+        This permanently deletes the parent account, the child's progress, session history and voice recordings, in the cloud and on this device. It cannot be undone.
+      </div>
+      <input
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        type="password"
+        autoComplete="current-password"
+        placeholder="Enter your password to confirm"
+        aria-label="Password"
+        className="rounded-xl border-2 border-ink/20 px-3 py-2 text-base outline-none focus:border-rose-500"
+      />
+      {msg && <div className="text-sm font-bold text-rose-700">{msg}</div>}
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(false)} className="btn btn-secondary flex-1 text-base" disabled={busy}>
+          Cancel
+        </button>
+        <button
+          disabled={busy || !password}
+          onClick={async () => {
+            setBusy(true)
+            setMsg(null)
+            try {
+              await deleteAccount(password)
+              nav('/', { replace: true })
+            } catch (e) {
+              setMsg((e as Error).message)
+              setBusy(false)
+            }
+          }}
+          className="btn btn-warn flex-1 text-base"
+        >
+          {busy ? 'Deleting…' : 'Delete forever'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SettingsTab() {
   const progress = useProgress((s) => s.progress)!
   const setChildName = useProgress((s) => s.setChildName)
   const setDailyGoal = useProgress((s) => s.setDailyGoal)
   const setSettings = useProgress((s) => s.setSettings)
-  const resetAll = useProgress((s) => s.resetAll)
+  const resetProgress = useSync((s) => s.resetProgress)
+  const signedIn = useSync((s) => Boolean(s.user))
   const nav = useNavigate()
   const [name, setName] = useState(progress.childName)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
   const [showRecorder, setShowRecorder] = useState(false)
 
   return (
@@ -465,19 +536,30 @@ function SettingsTab() {
           </button>
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="font-bold text-rose-700">This erases all progress on this device. If you are signed in, the cloud copy will be overwritten on the next sync.</div>
+            <div className="font-bold text-rose-700">
+              This erases {progress.childName}'s progress and session history{signedIn ? ' on this device and in the cloud backup' : ' on this device'}. Voice recordings are kept.
+            </div>
+            {resetError && <div className="text-sm font-bold text-rose-700">{resetError}</div>}
             <div className="flex gap-2">
               <button onClick={() => setConfirmReset(false)} className="btn btn-secondary flex-1 text-base">
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  resetAll()
-                  nav('/', { replace: true })
+                disabled={resetting}
+                onClick={async () => {
+                  setResetting(true)
+                  setResetError(null)
+                  try {
+                    await resetProgress()
+                    nav('/', { replace: true })
+                  } catch (e) {
+                    setResetError((e as Error).message)
+                    setResetting(false)
+                  }
                 }}
                 className="btn btn-warn flex-1 text-base"
               >
-                Yes, reset
+                {resetting ? 'Resetting…' : 'Yes, reset'}
               </button>
             </div>
           </div>

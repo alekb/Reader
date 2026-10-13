@@ -14,5 +14,6 @@ if [ -z "${CHROME_PATH:-}" ]; then
 fi
 node e2e/walkthrough.mjs http://localhost:4173 e2e/shots
 SEED=1 node e2e/walkthrough.mjs http://localhost:4173 e2e/shots-seeded
+node e2e/parent-flows.mjs http://localhost:4173
 node e2e/paint.mjs
 node e2e/gallery.mjs

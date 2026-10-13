@@ -8,6 +8,7 @@ import { useProgress } from '../store/progressStore'
 import { sfx } from '../speech/sfx'
 import { say } from '../speech/phonics'
 import { warmUp } from '../speech/tts'
+import { firebaseEnabled } from '../firebase/config'
 
 export function Onboarding() {
   const nav = useNavigate()
@@ -58,7 +59,11 @@ export function Onboarding() {
       >
         Start the adventure ➜
       </button>
-      <div className="text-center text-sm text-ink/50">Parents: open the dashboard from the home screen to sign in and sync progress.</div>
+      {firebaseEnabled && (
+        <button onClick={() => nav('/parent')} className="text-center text-sm font-bold text-grape underline">
+          Parents: already have an account? Sign in to restore progress
+        </button>
+      )}
     </Screen>
   )
 }

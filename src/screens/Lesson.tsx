@@ -16,6 +16,7 @@ import { xpFor } from '../engine/progress'
 import { useProgress } from '../store/progressStore'
 import { say } from '../speech/phonics'
 import { stopSpeaking, warmUp } from '../speech/tts'
+import { LESSON_BACK_EVENT } from '../components/BackButton'
 
 const STEP_TITLES: Record<Step['kind'], string> = {
   speedSounds: 'Speed sounds',
@@ -62,6 +63,11 @@ export function Lesson() {
   }, [])
 
   useEffect(() => () => stopSpeaking(), [])
+  useEffect(() => {
+    const onBack = () => setConfirmExit((open) => !open)
+    window.addEventListener(LESSON_BACK_EVENT, onBack)
+    return () => window.removeEventListener(LESSON_BACK_EVENT, onBack)
+  }, [])
 
   if (!progress || !lesson) return null
   const step = lesson.steps[stepIndex]
