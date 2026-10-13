@@ -318,7 +318,7 @@ async function makeSound(gpc) {
     // ŋ: where the vowel formants fade into the murmur. ks: the silent closure before the burst.
     let cut = ipa === 'ŋ' ? firstIndex(fr, (f) => f.mid < peakMid * 0.12, vPeak) : firstIndex(fr, (f) => f.rms < peakRms * 0.03, vPeak)
     if (cut < 0) cut = vPeak + 10
-    const tail = trimSilence(slice(pcm, cut + 1, fr.length))
+    const tail = trimSilence(slice(pcm, cut + 1, fr.length), 0.05)
     return finish(ipa === 'ŋ' ? loopTo(tail, 450) : tail, 15, 40)
   }
 
