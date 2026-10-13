@@ -17,6 +17,7 @@ export function RecordSounds() {
   const recRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const uploadRecording = useSync((s) => s.uploadRecording)
+  const deleteRemote = useSync((s) => s.deleteRecording)
   const supported = typeof MediaRecorder !== 'undefined' && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia)
 
   useEffect(() => {
@@ -97,6 +98,7 @@ export function RecordSounds() {
                 <button
                   onClick={async () => {
                     await deleteRecording(g.id)
+                    deleteRemote(g.id)
                     setKeys((k) => {
                       const n = new Set(k)
                       n.delete(g.id)

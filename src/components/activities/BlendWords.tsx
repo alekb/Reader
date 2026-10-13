@@ -174,7 +174,7 @@ export function BlendWords({ words, knownGpcIds, onResult, onDone }: Props) {
         instruction={check.instruction}
         columns={check.columns}
         big={check.kind === 'picture'}
-        onAnswer={(correct, ms) => onResult({ kind: 'word', id: word.word, correct: correct && !helped ? true : correct, ms, group: word.group, nonsense: alien })}
+        onAnswer={(correct, ms) => onResult({ kind: 'word', id: word.word, correct: correct && !helped, ms, group: word.group, nonsense: alien })}
         onDone={next}
       >
         {check.kind === 'picture' && <div className="font-letter text-center text-5xl font-bold">{word.word}</div>}

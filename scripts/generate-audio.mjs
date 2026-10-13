@@ -462,5 +462,21 @@ async function worker() {
 await Promise.all(Array.from({ length: CONCURRENCY }, worker))
 fs.mkdirSync(OUT, { recursive: true })
 fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 1))
+// After a full run, delete clips that the manifest no longer references (removed words, old phrases).
+if (!ONLY) {
+  const referenced = new Set(['sounds', 'letters', 'words', 'phrases'].flatMap((k) => Object.values(manifest[k])))
+  let pruned = 0
+  for (const dir of ['sounds', 'letters', 'words', 'phrases']) {
+    const abs = path.join(OUT, dir)
+    if (!fs.existsSync(abs)) continue
+    for (const f of fs.readdirSync(abs)) {
+      if (!referenced.has(`${dir}/${f}`)) {
+        fs.rmSync(path.join(abs, f))
+        pruned++
+      }
+    }
+  }
+  if (pruned) console.log(`Removed ${pruned} unreferenced clips.`)
+}
 console.log(`Done: ${done} generated, ${skipped} already existed, ${failed} failed. Manifest: ${manifestFile}`)
 process.exit(failed ? 1 : 0)

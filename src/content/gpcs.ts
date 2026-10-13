@@ -97,7 +97,7 @@ export const GPCS: Gpc[] = [
   g('ff', '/f/', 'fff', 'puff', '💨', 'Same sound as f, just two letters: fffff', true, 5),
   g('l', '/l/', 'lll', 'lion', '🦁', 'Lick a lollipop: lllll', true, 5, { letterName: 'el' }),
   g('ll', '/l/', 'lll', 'bell', '🔔', 'Same sound as l, just two letters: lllll', true, 5),
-  g('ss', '/s/', 'sss', 'kiss', '💋', 'Same sound as s, just two letters: sssss', true, 5),
+  g('ss', '/s/', 'sss', 'dress', '👗', 'Same sound as s, just two letters: sssss', true, 5),
   // ---- Group 6: j v w x ----
   g('j', '/j/', 'j', 'jet', '✈️', 'Zoom like a jet: j, j, j', false, 6, { letterName: 'jay' }),
   g('v', '/v/', 'vvv', 'van', '🚐', 'Hold a steering wheel and drive: vvvvv', true, 6, { letterName: 'vee' }),

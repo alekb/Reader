@@ -29,11 +29,11 @@ const RAW: string[] = [
   // Group 3: g o c k
   'g-o-t', 'd-o-g:🐶', 'c-o-t:🛏️', 'c-a-t:🐱', 'c-a-n:🥫', 'c-a-p:🧢', 'k-i-d:🧒', 'k-i-t', 'c-o-d:🐟', 'p-o-t:🍲', 't-o-p:🔝',
   'm-o-p:🧹', 'd-o-t:⚫', 'n-o-t', 'n-o-d', 'o-n', 'p-o-p:🎈', 'g-a-p', 'g-a-s:⛽', 'd-i-g:⛏️', 'p-i-g:🐷', 't-a-g:🏷️', 'c-o-g:⚙️',
-  'g-o-d', 'n-a-g', 'p-i-c-k', 'd-o-c-k',
+  'n-a-g', 'p-i-c-k', 'd-o-c-k',
   // Group 4: ck e u r
   'd-u-ck:🦆', 's-o-ck:🧦', 'k-i-ck:🦵', 'p-i-ck', 'n-e-ck:🦒', 'p-e-ck', 'd-e-ck', 't-i-ck:✅', 's-i-ck:🤒', 'r-o-ck:🪨', 't-u-ck',
   'p-e-t:🐹', 't-e-n:🔟', 'n-e-t:🥅', 'm-e-n:👬', 'p-e-n:🖊️', 'g-e-t', 'p-e-g', 'r-e-d:🔴', 'u-p:⬆️', 'c-u-p:☕', 'm-u-d',
-  's-u-n:☀️', 'r-u-n:🏃', 'm-u-g:🍺', 'c-u-t:✂️', 'g-u-m', 'n-u-t:🥜', 't-u-g', 'd-u-g', 'p-u-p:🐶', 'r-a-t:🐀', 'r-i-p', 'r-o-d:🎣',
+  's-u-n:☀️', 'r-u-n:🏃', 'm-u-g', 'c-u-t:✂️', 'g-u-m', 'n-u-t:🥜', 't-u-g', 'd-u-g', 'p-u-p:🐶', 'r-a-t:🐀', 'r-i-p', 'r-o-d:🎣',
   'r-u-g', 'r-a-m:🐏', 'r-i-m', 'r-o-t', 'r-a-p', 'r-e-s-t', 'k-i-ck-s',
   // Group 5: h b f ff l ll ss
   'h-a-t:🎩', 'h-e-n:🐔', 'h-o-p:🐇', 'h-u-g:🤗', 'h-o-t:🔥', 'h-i-p', 'h-u-t:🛖', 'h-i-m', 'h-i-d', 'h-a-m:🍖',
@@ -41,7 +41,7 @@ const RAW: string[] = [
   'f-a-n:🪭', 'f-i-t', 'f-i-g', 'f-o-g:🌫️', 'f-u-n:🎉', 'f-e-d', 'o-ff', 'p-u-ff:💨', 'h-u-ff', 'c-u-ff',
   'l-e-g:🦵', 'l-i-p:👄', 'l-o-g:🪵', 'l-o-t', 'l-i-d', 'l-e-t', 'l-a-p', 'l-i-ck:👅',
   'b-e-ll:🔔', 'd-o-ll:🪆', 'h-i-ll:⛰️', 'f-i-ll', 't-e-ll', 'w-e-ll', 'f-e-ll', 'b-i-ll',
-  'h-i-ss:🐍', 'k-i-ss:💋', 'm-e-ss', 'l-e-ss', 'f-u-ss', 'b-o-ss', 'm-i-ss',
+  'h-i-ss:🐍', 'k-i-ss', 'm-e-ss', 'l-e-ss', 'f-u-ss', 'b-o-ss', 'm-i-ss',
   // Group 6: j v w x
   'j-a-m:🍓', 'j-e-t:✈️', 'j-o-g:🏃', 'j-u-g:🫙', 'j-a-b', 'v-a-n:🚐', 'v-e-t:🩺', 'v-a-t',
   'w-e-t:💦', 'w-i-n:🏆', 'w-i-g:💇', 'w-e-b:🕸️', 'w-a-x:🕯️', 'w-a-g',
@@ -90,7 +90,7 @@ const RAW: string[] = [
   // Group 15: ay ou ie ea oy
   'd-ay:🌞', 'p-l-ay:🎮', 's-ay:🗣️', 'w-ay', 'm-ay', 'h-ay:🌾', 's-t-ay', 't-r-ay:🍽️', 'c-l-ay:🏺', 'a-w-ay', 'c-r-ay-o-n:🖍️',
   'ou-t', 'l-ou-d:📢', 'c-l-ou-d:☁️', 'sh-ou-t:📣', 's-ou-n-d:🔊', 'm-ou-th:👄', 'r-ou-n-d:⚪', 'f-ou-n-d', 'p-r-ou-d',
-  'p-ie:🥧', 't-ie:👔', 'l-ie', 'd-ie', 'c-r-ie-d:😭', 't-r-ie-d', 'f-r-ie-d:🍳', 'f-l-ie-s:🪰',
+  'p-ie:🥧', 't-ie:👔', 'l-ie', 'c-r-ie-d:😭', 't-r-ie-d', 'f-r-ie-d:🍳', 'f-l-ie-s:🪰',
   'ea-t:🍽️', 's-ea:🌊', 't-ea:🍵', 'l-ea-f:🍃', 'r-ea-d:📖', 'm-ea-t:🥩', 's-ea-t:💺', 'b-ea-d:📿', 'b-ea-ch:🏖️', 't-ea-ch', 'd-r-ea-m:💭', 'c-r-ea-m:🍦', 'c-l-ea-n:🧽', 'p-ea-s:🫛',
   'b-oy:👦', 't-oy:🧸', 'j-oy:😄', 'e-n-j-oy', 'r-oy-a-l:👑', 'a-nn-oy', 'c-ow-b-oy:🤠',
   // Group 16: ir ue aw wh ph ew

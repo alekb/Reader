@@ -52,12 +52,14 @@ With no Firebase configuration the app works fully offline and saves progress on
 
 1. Create a free project at <https://console.firebase.google.com>.
 2. **Authentication → Sign-in method → Email/Password → Enable.**
-3. **Firestore Database → Create database** (production mode). Then open **Rules** and paste the contents of [`firestore.rules`](firestore.rules) (each parent account can only read/write its own data).
+3. **Firestore Database → Create database** (production mode). Then open **Rules** and paste the contents of [`firestore.rules`](firestore.rules), or run `firebase deploy --only firestore:rules`. Each parent account can only read and write its own documents, with size limits on recordings.
 4. **Project settings → General → Your apps → Add app → Web.** Copy the config values.
 5. Copy `.env.example` to `.env` and fill in the `VITE_FIREBASE_*` values. Rebuild.
 6. In the app: Home → **Parents** → solve the multiplication → **Account** → create the parent account.
 
-From then on progress, session history and any sound recordings sync automatically. After a reinstall or on a new device, sign in and tap **Restore from cloud**.
+From then on progress, session history and any sound recordings sync automatically. After a reinstall or on a new device, tap **Parents: already have an account? Sign in to restore progress** on the first screen.
+
+Account safety built in: a device never mixes two parent accounts (signing in with a different account replaces the local copy), **Sign out and remove from this device** clears local data, **Reset all progress** clears the cloud copy too, and **Delete account and all data** (Parents → Account) permanently removes the account and everything stored for it.
 
 Data layout in Firestore:
 
@@ -102,16 +104,9 @@ firebase deploy --only hosting --project <your-firebase-project-id>
 
 **GitHub Pages:** free only for public repos. Make the repo public (Settings → General → Danger Zone → Change visibility), then Settings → Pages → Source: **GitHub Actions** and re-run the "Deploy web app to GitHub Pages" workflow. It publishes at `https://<user>.github.io/<repo>/`.
 
-`dist/` is a static site. Any static host works (Firebase Hosting, Netlify, Vercel, GitHub Pages). For Firebase Hosting:
+Any other static host works too (Netlify, Vercel): `dist/` is a plain static site.
 
-```bash
-npm i -g firebase-tools
-firebase login
-firebase init hosting     # public directory: dist, single-page app: yes
-npm run build && firebase deploy
-```
-
-The app is a PWA: on Android Chrome it can be installed to the home screen and works offline.
+The app is a PWA: on Android Chrome it can be installed to the home screen. The app shell works offline; on the web each audio clip is cached the first time it plays, while the Android app has every clip bundled.
 
 ## Audio: studio voice, bundled and offline
 
@@ -163,6 +158,25 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 - `npm test` runs the engine tests (scheduler math, group gating, lesson building, nonsense-word safety) and content integrity tests (every sentence only uses sounds and heart words taught by its island; every word's segmentation spells the word).
 - `npm run e2e` builds, serves and drives the whole app in headless Chromium (fresh learner and a seeded learner), screenshots every activity into `e2e/shots*/` and fails on any runtime error.
+- CI runs build, tests and lint on every push and pull request before building the APK.
+
+## Releasing
+
+**Code-side release plumbing is in place:** signed Play bundle in CI, version numbers from the CI run, app icons and splash screens (`npm run icons`), microphone permission, Android back button, crash screen, account deletion, Firestore rules, and drafts of the privacy policy ([`docs/PRIVACY.md`](docs/PRIVACY.md)) and the account-deletion page ([`public/delete-account.html`](public/delete-account.html), served at `/delete-account.html`).
+
+**Owner checklist before the first Play release:**
+
+1. **Choose the permanent app id.** Replace `com.readerquest.app` in `capacitor.config.ts`, `android/app/build.gradle` (`namespace`, `applicationId`) and the `MainActivity` package path. It can never change after the first upload.
+2. **Create an upload keystore** and add four repository secrets: `ANDROID_KEYSTORE_BASE64` (the `.jks` file, base64-encoded), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+   ```bash
+   keytool -genkeypair -v -keystore upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   base64 -w0 upload.jks   # paste into ANDROID_KEYSTORE_BASE64
+   ```
+   Then run the workflow manually or push a tag such as `v1.0.0`; download `reader-quest-release-aab` from the run.
+3. **Add the six `VITE_FIREBASE_*` secrets** so release builds include cloud backup. In Google Cloud, restrict the Firebase API key to your app, and consider enabling App Check.
+4. **Finish and host the privacy policy and deletion page.** Fill in the placeholders in `docs/PRIVACY.md` and `public/delete-account.html`; host the policy (for example with the web app) and give both URLs to Play Console.
+5. **Play Console:** target audience (ages 6–8 and 9–12), Families policy declarations, Data safety form (name, app activity, email, audio recordings; no sharing; encrypted in transit; deletion available), content rating questionnaire, store listing (icon from `public/icons/store-icon-512.png`, feature graphic, phone screenshots from `npm run e2e`).
+6. **Test on a real phone** from the internal testing track: microphone recording, back button, sign-in and restore after reinstall, account deletion.
 
 ## Known limitations / ideas
 

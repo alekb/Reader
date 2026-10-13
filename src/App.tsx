@@ -10,11 +10,13 @@ import { ParentGate } from './screens/ParentGate'
 import { SessionComplete } from './screens/SessionComplete'
 import { Stickers } from './screens/Stickers'
 import { Wardrobe } from './screens/Wardrobe'
+import { BackButton } from './components/BackButton'
 
 export default function App() {
   const progress = useProgress((s) => s.progress)
   return (
     <HashRouter>
+      <BackButton />
       <Routes>
         {!progress ? (
           <>
