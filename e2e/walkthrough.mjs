@@ -25,16 +25,6 @@ const errors = []
 page.on('pageerror', (e) => errors.push(String(e)))
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 
-// ---- icons ----
-const svg = fs.readFileSync('public/favicon.svg', 'utf8')
-for (const size of [192, 512]) {
-  const p = await ctx.newPage()
-  await p.setViewportSize({ width: size, height: size })
-  await p.setContent(`<html><body style="margin:0">${svg.replace('<svg ', `<svg width="${size}" height="${size}" `)}</body></html>`)
-  await p.screenshot({ path: path.join('public/icons', `icon-${size}.png`), omitBackground: true })
-  await p.close()
-}
-
 const shot = (name) => page.screenshot({ path: path.join(out, `${name}.png`) })
 
 // Optional: seed a learner who already knows 8 sounds so later activities run.
