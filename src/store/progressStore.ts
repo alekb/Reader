@@ -10,7 +10,7 @@ import { advanceGroups, newlyUnlockedIds } from '../engine/curriculum'
 import { bumpStreak, dayKey } from '../engine/scheduler'
 import { mergeProgress, mergeSessions } from '../firebase/sync'
 import { setSfxEnabled } from '../speech/sfx'
-import { setVoiceRate } from '../speech/tts'
+import { setVoiceGender, setVoiceRate } from '../speech/tts'
 
 interface ActiveSession {
   id: string
@@ -215,8 +215,6 @@ export const useProgress = create<ProgressState>()(
         const p = get().progress
         if (!p) return
         const settings = { ...p.settings, ...s }
-        setSfxEnabled(settings.sfx)
-        setVoiceRate(settings.voiceRate)
         set({ progress: { ...p, settings, updatedAt: Date.now() }, dirty: get().dirty + 1 })
       },
 
@@ -272,10 +270,21 @@ export const useProgress = create<ProgressState>()(
           // Always run the migration: it is cheap and back-fills new default unlocks.
           const migrated = migrateProgress(state.progress)
           if (migrated && migrated !== state.progress) useProgress.setState({ progress: migrated })
-          setSfxEnabled(state.progress.settings.sfx)
-          setVoiceRate(state.progress.settings.voiceRate)
+          applyAudioSettings(state.progress)
         }
       },
     },
   ),
 )
+
+/** Point the speech engine at the saved audio settings. */
+function applyAudioSettings(p: Progress) {
+  setSfxEnabled(p.settings.sfx)
+  setVoiceRate(p.settings.voiceRate)
+  setVoiceGender(p.settings.voice ?? 'female')
+}
+
+// Re-apply on every change, so a cloud restore or sign-in picks up the parent's choices too.
+useProgress.subscribe((s, prev) => {
+  if (s.progress && s.progress.settings !== prev.progress?.settings) applyAudioSettings(s.progress)
+})

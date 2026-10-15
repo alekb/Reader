@@ -36,6 +36,12 @@ export default defineConfig({
         navigateFallback: 'index.html',
         // Audio clips are fetched on demand and cached for offline use.
         runtimeCaching: [
+          // Manifests change when clips are added (e.g. the male voice set), so check the network first.
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/audio/') && url.pathname.endsWith('/manifest.json'),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'audio-manifests', networkTimeoutSeconds: 3 },
+          },
           {
             urlPattern: ({ url }) => url.pathname.includes('/audio/'),
             handler: 'CacheFirst',

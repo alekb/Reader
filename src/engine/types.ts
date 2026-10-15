@@ -50,8 +50,8 @@ export interface Progress {
   streak: { count: number; lastDay: string }
   /** Minutes per day target shown to the child. */
   dailyGoalMin: number
-  /** Audio settings */
-  settings: { sfx: boolean; voiceRate: number }
+  /** Audio settings. `voice` is missing on progress saved before it existed: treat as female. */
+  settings: { sfx: boolean; voiceRate: number; voice?: 'female' | 'male' }
   createdAt: number
   updatedAt: number
 }

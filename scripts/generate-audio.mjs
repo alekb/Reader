@@ -3,7 +3,10 @@
  * Google Cloud Text-to-Speech, so the app ships studio-quality audio that works
  * offline and needs no key at runtime.
  *
- *   GOOGLE_TTS_API_KEY=... node scripts/generate-audio.mjs [--force] [--only sounds|letters|words|phrases] [--analyze]
+ *   GOOGLE_TTS_API_KEY=... node scripts/generate-audio.mjs [--voice female|male] [--force] [--only sounds|letters|words|phrases] [--analyze]
+ *
+ * The female set goes to public/audio/, the male set to public/audio/male/;
+ * parents choose between them in Parents → Settings → Voice.
  *
  * Pure consonant sounds are the hard part: the engine refuses a lone consonant
  * phoneme, so each consonant is synthesized inside a syllable ("sɑ", "tə") and
@@ -14,7 +17,7 @@
  *     appear, looped the same way,
  *   - stops (t p k d g b) keep only the burst plus a few ms, so "t" not "tuh",
  *   - vowels are synthesized directly from IPA.
- * Output: public/audio/{sounds,letters,words,phrases}/*.mp3 + manifest.json.
+ * Output: public/audio[/male]/{sounds,letters,words,phrases}/*.mp3 + manifest.json.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -31,9 +34,14 @@ const args = process.argv.slice(2)
 const FORCE = args.includes('--force')
 const ANALYZE = args.includes('--analyze')
 const ONLY = args.includes('--only') ? args[args.indexOf('--only') + 1] : null
-const VOICE = process.env.TTS_VOICE || 'en-US-Neural2-F'
+const GENDER = args.includes('--voice') ? args[args.indexOf('--voice') + 1] : 'female'
+if (GENDER !== 'female' && GENDER !== 'male') {
+  console.error('--voice must be female or male.')
+  process.exit(1)
+}
+const VOICE = process.env.TTS_VOICE || (GENDER === 'male' ? 'en-US-Neural2-J' : 'en-US-Neural2-F')
 const SR = 24000
-const OUT = path.resolve('public/audio')
+const OUT = path.resolve(GENDER === 'male' ? 'public/audio/male' : 'public/audio')
 const CONCURRENCY = 6
 
 // ---------------------------------------------------------------- content
@@ -380,7 +388,7 @@ function finish(pcm, fadeIn, fadeOut) {
 }
 
 // ---------------------------------------------------------------- jobs
-const manifest = { voice: VOICE, sounds: {}, letters: {}, words: {}, phrases: {} }
+const manifest = { voice: VOICE, gender: GENDER, sounds: {}, letters: {}, words: {}, phrases: {} }
 const manifestFile = path.join(OUT, 'manifest.json')
 const existing = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, 'utf8')) : null
 

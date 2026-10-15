@@ -20,6 +20,19 @@ export function setVoiceRate(rate: number) {
   baseRate = rate
 }
 
+export type VoiceGender = 'female' | 'male'
+let gender: VoiceGender = 'female'
+/** Which voice the parent picked. Bundled clips and the device voice both follow it. */
+export function setVoiceGender(g: VoiceGender) {
+  if (g === gender) return
+  gender = g
+  preferredVoice = pickVoice()
+  nativeVoice = null
+}
+export function getVoiceGender(): VoiceGender {
+  return gender
+}
+
 /** Optional lookup of a pre-recorded clip for an exact phrase (set by phonics.ts). */
 let phraseResolver: ((text: string) => Promise<string | null>) | null = null
 export function setPhraseResolver(fn: (text: string) => Promise<string | null>) {
@@ -30,6 +43,51 @@ let generation = 0
 let chain: Promise<void> = Promise.resolve()
 let preferredVoice: SpeechSynthesisVoice | null = null
 let voicesLoaded = false
+
+// Device voices rarely say their gender, so we go by well-known names.
+// Android's Google voices are codes: en-us-x-iol / iom / tpd are male.
+const MALE_VOICE = /\b(male|david|mark|guy|daniel|alex|fred|tom|aaron|arthur|evan|nathan|reed|rocko|eddy|grandpa|ryan|christopher|eric|andrew|brian|roger|steffan|davis|tony|jason)\b|en-us-x-(iol|iom|tpd)/i
+const FEMALE_VOICE = /\b(female|samantha|karen|moira|zira|aria|jenny|ava|allison|susan|victoria|tessa|serena|fiona|joanna|salli|kendra|kimberly|ivy|michelle|emma|nicky)\b|en-us-x-(iob|iog|sfg|tpc|tpf)/i
+
+function genderScore(name: string): number {
+  const male = MALE_VOICE.test(name)
+  const female = FEMALE_VOICE.test(name)
+  if (gender === 'male') return male ? 8 : female ? -8 : 0
+  return female ? 1 : male ? -8 : 0
+}
+
+/** Index of the best native (Android) male voice, or undefined for the system default (used for Female, as before). */
+let nativeVoice: Promise<number | undefined> | null = null
+export function nativeVoiceIndex(): Promise<number | undefined> {
+  if (gender === 'female') return Promise.resolve(undefined)
+  if (!nativeVoice) {
+    nativeVoice = TextToSpeech.getSupportedVoices()
+      .then(({ voices }) => {
+        let best: number | undefined
+        let bestScore = 0
+        voices.forEach((v, i) => {
+          if (!/^en[-_]/i.test(v.lang)) return
+          let sc = genderScore(`${v.name} ${v.voiceURI}`)
+          if (sc <= 0) return
+          if (/en[-_]US/i.test(v.lang)) sc += 3
+          if (v.localService) sc += 1
+          if (sc > bestScore) {
+            best = i
+            bestScore = sc
+          }
+        })
+        return best
+      })
+      .catch(() => undefined)
+  }
+  return nativeVoice
+}
+
+/** The browser voice for the chosen gender (used by phonics.ts too). */
+export function webVoice(): SpeechSynthesisVoice | null {
+  if (!voicesLoaded) preferredVoice = pickVoice()
+  return preferredVoice
+}
 
 function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof speechSynthesis === 'undefined') return null
@@ -42,7 +100,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
     if (/en[-_]US/i.test(v.lang)) s += 3
     if (/google/i.test(v.name)) s += 4
     if (/natural|neural|premium|enhanced/i.test(v.name)) s += 5
-    if (/female|samantha|karen|moira|zira|aria|jenny/i.test(v.name)) s += 1
+    s += genderScore(v.name)
     if (v.localService) s += 1
     return s
   }
@@ -63,12 +121,12 @@ function sleep(ms: number): Promise<void> {
 function speakWeb(text: string, opts: SpeakOptions, gen: number): Promise<void> {
   return new Promise((resolve) => {
     if (typeof speechSynthesis === 'undefined') return resolve()
-    if (!voicesLoaded) preferredVoice = pickVoice()
+    const voice = webVoice()
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'en-US'
     u.rate = opts.rate ?? baseRate
     u.pitch = opts.pitch ?? 1.05
-    if (preferredVoice) u.voice = preferredVoice
+    if (voice) u.voice = voice
     let done = false
     const finish = () => {
       if (done) return
@@ -87,7 +145,9 @@ function speakWeb(text: string, opts: SpeakOptions, gen: number): Promise<void> 
 async function speakNative(text: string, opts: SpeakOptions, gen: number): Promise<void> {
   if (gen !== generation) return
   try {
-    await TextToSpeech.speak({ text, lang: 'en-US', rate: opts.rate ?? baseRate, pitch: opts.pitch ?? 1.05, category: 'playback' })
+    const voice = await nativeVoiceIndex()
+    if (gen !== generation) return
+    await TextToSpeech.speak({ text, lang: 'en-US', rate: opts.rate ?? baseRate, pitch: opts.pitch ?? 1.05, voice, category: 'playback' })
   } catch {
     /* ignore */
   }

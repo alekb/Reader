@@ -1,0 +1,52 @@
+name: Generate voice clips
+
+# Manual only: Actions → "Generate voice clips" → Run workflow. Pick the branch
+# and the voice; the run synthesizes any missing clips with Google Cloud TTS and
+# commits them to that branch. Needs the GOOGLE_TTS_API_KEY repository secret
+# (Settings → Secrets and variables → Actions).
+#
+# Commits made by this workflow do not trigger the APK build; run
+# "Android APK and web build" by hand afterwards, or push any other commit.
+on:
+  workflow_dispatch:
+    inputs:
+      voice:
+        description: Which voice set to generate
+        type: choice
+        options: [male, female]
+        default: male
+      force:
+        description: Regenerate clips that already exist
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Generate clips
+        env:
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+        run: node scripts/generate-audio.mjs --voice ${{ inputs.voice }} ${{ inputs.force && '--force' || '' }}
+      - name: Commit clips
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add public/audio
+          if git diff --cached --quiet; then
+            echo "No new clips."
+          else
+            git commit -m "Generate ${{ inputs.voice }} voice clips"
+            git push
+          fi
