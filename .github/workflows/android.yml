@@ -91,7 +91,7 @@ jobs:
           gh release delete latest-apk --cleanup-tag --yes || true
           gh release create latest-apk reader-quest.apk \
             --target "$GITHUB_SHA" \
-            --prerelease \
+            --latest \
             --title "Latest Android build" \
             --notes "Debug APK built from main at ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC'). Install: download reader-quest.apk on the phone, open it, allow installing from this source."
 
