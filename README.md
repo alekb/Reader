@@ -73,6 +73,8 @@ users/{uid}/recordings/{key}     parent-recorded sound clips (base64)
 
 **Latest APK, one fixed link:** https://github.com/alekb/Reader/releases/download/latest-apk/reader-quest.apk (rebuilt on every merge to `main`). It is also listed on the repo's **Releases** page as "Latest Android build".
 
+**Updates keep progress.** Once the signing secrets below (Releasing, step 2) are set, every `main` build is a release APK signed with that one permanent key, published together with a `version.json`. The installed app checks it when opened (at most every 6 hours, and on demand from Parents → Settings → App). When a newer build exists, a red dot appears on the Parents tile, and the dashboard offers **Download update**. The phone's browser downloads the APK and Android installs it over the old one. Progress, stickers and looks are kept because the package name and signature stay the same. Android always asks you to confirm the install; there are no silent updates. A copy installed before the key was set up (a debug build) must be uninstalled once, then the signed build installed. Without the secrets, `latest-apk` falls back to a debug build that can't update an existing install. The web version and Play Store bundles don't include the update check: the web app updates itself, and Play handles updates for its builds.
+
 **No SDK needed:** every push runs the "Android APK" GitHub Actions workflow, which builds a debug APK on GitHub's runners. Open the repo's **Actions** tab → latest run → **Artifacts** → `reader-quest-debug-apk`, copy `app-debug.apk` to the phone and install it (allow "install unknown apps"). To bake cloud sync into that APK, add the `VITE_FIREBASE_*` values as repository secrets (Settings → Secrets and variables → Actions).
 
 To build locally instead, the Android project is in `android/` and you need Android Studio (or the Android SDK + JDK 17+):
@@ -168,8 +170,8 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 **Owner checklist before the first Play release:**
 
-1. **Choose the permanent app id.** Replace `com.readerquest.app` in `capacitor.config.ts`, `android/app/build.gradle` (`namespace`, `applicationId`) and the `MainActivity` package path. It can never change after the first upload.
-2. **Create an upload keystore** and add four repository secrets: `ANDROID_KEYSTORE_BASE64` (the `.jks` file, base64-encoded), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+1. **Choose the permanent app id.** Replace `com.readerquest.app` in `capacitor.config.ts`, `android/app/build.gradle` (`namespace`, `applicationId`) and the `MainActivity` package path. It can never change after the first upload. Changing it also turns sideloaded copies into a separate app (no in-place update), so settle it early.
+2. **Create an upload keystore** (it also signs the self-updating `latest-apk` builds, so keep it backed up) and add four repository secrets: `ANDROID_KEYSTORE_BASE64` (the `.jks` file, base64-encoded), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
    ```bash
    keytool -genkeypair -v -keystore upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
    base64 -w0 upload.jks   # paste into ANDROID_KEYSTORE_BASE64

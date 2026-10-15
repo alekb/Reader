@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useProgress } from './store/progressStore'
 import './store/syncStore'
+import './store/updateStore'
 import { Alphabet } from './screens/Alphabet'
 import { Dashboard } from './screens/Dashboard'
 import { Home } from './screens/Home'
