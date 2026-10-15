@@ -71,7 +71,7 @@ users/{uid}/recordings/{key}     parent-recorded sound clips (base64)
 
 ## Android app (Capacitor)
 
-**Latest APK, one fixed link:** https://github.com/alekb/Reader/releases/download/latest-apk/reader-quest.apk (rebuilt on every merge to `main`; you must be signed in to GitHub while the repo is private).
+**Latest APK, one fixed link:** https://github.com/alekb/Reader/releases/download/latest-apk/reader-quest.apk (rebuilt on every merge to `main`). It is also listed on the repo's **Releases** page as "Latest Android build".
 
 **No SDK needed:** every push runs the "Android APK" GitHub Actions workflow, which builds a debug APK on GitHub's runners. Open the repo's **Actions** tab → latest run → **Artifacts** → `reader-quest-debug-apk`, copy `app-debug.apk` to the phone and install it (allow "install unknown apps"). To bake cloud sync into that APK, add the `VITE_FIREBASE_*` values as repository secrets (Settings → Secrets and variables → Actions).
 
