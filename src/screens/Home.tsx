@@ -7,6 +7,7 @@ import { LEVEL_NAMES, levelProgress, unlockedTricks } from '../content/parts'
 import { soundsKnown, summarize } from '../engine/curriculum'
 import { dayKey } from '../engine/scheduler'
 import { useProgress } from '../store/progressStore'
+import { useUpdate } from '../store/updateStore'
 import { say } from '../speech/phonics'
 import { sfx } from '../speech/sfx'
 import { stopSpeaking, warmUp } from '../speech/tts'
@@ -15,6 +16,7 @@ export function Home() {
   const nav = useNavigate()
   const progress = useProgress((s) => s.progress)!
   const sessions = useProgress((s) => s.sessions)
+  const updateReady = useUpdate((s) => s.status === 'available')
   const [mood, setMood] = useState<'idle' | 'happy' | 'talking'>('idle')
   const [trickClass, setTrickClass] = useState('')
   const [trickIndex, setTrickIndex] = useState(0)
@@ -114,7 +116,8 @@ export function Home() {
           <span className="text-3xl">🔤</span>
           <span className="text-xs font-extrabold">ABC</span>
         </button>
-        <button onClick={() => nav('/parent')} className="tile flex-col py-3">
+        <button onClick={() => nav('/parent')} className="tile relative flex-col py-3">
+          {updateReady && <span aria-label="App update available" className="absolute right-2 top-2 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white" />}
           <span className="text-3xl">👨‍👩‍👧</span>
           <span className="text-xs font-extrabold">Parents</span>
         </button>

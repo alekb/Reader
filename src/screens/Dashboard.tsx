@@ -10,6 +10,7 @@ import type { MasteryLevel } from '../engine/scheduler'
 import type { SessionLog } from '../engine/types'
 import { useProgress } from '../store/progressStore'
 import { useSync } from '../store/syncStore'
+import { openDownload, useUpdate } from '../store/updateStore'
 import { isParentUnlocked } from './ParentGate'
 
 type Tab = 'progress' | 'activity' | 'sounds' | 'account' | 'settings'
@@ -48,6 +49,7 @@ export function Dashboard() {
   return (
     <Screen className="gap-3 px-4 pb-10 text-base">
       <TopBar title="Parent dashboard" onBack={() => nav('/')} />
+      <UpdateBanner />
       <div className="flex gap-1 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 whitespace-nowrap rounded-xl px-2 py-2 text-xs font-extrabold ${tab === t.id ? 'bg-grape text-white' : 'text-ink/60'}`}>
@@ -61,6 +63,60 @@ export function Dashboard() {
       {tab === 'account' && <AccountTab />}
       {tab === 'settings' && <SettingsTab />}
     </Screen>
+  )
+}
+
+function UpdateBanner() {
+  const latest = useUpdate((s) => s.latest)
+  const available = useUpdate((s) => s.status === 'available')
+  const [opening, setOpening] = useState(false)
+  if (!available || !latest) return null
+  return (
+    <div className="rounded-3xl bg-sky-100 p-4 shadow-sm ring-2 ring-sky-300">
+      <div className="text-lg font-extrabold">🎁 A new version is ready ({latest.versionName})</div>
+      <ol className="mt-1 list-decimal pl-5 text-sm text-ink/80">
+        <li>Tap Download. The phone's browser downloads the update.</li>
+        <li>Open the downloaded file (from the notification or Downloads) and tap Update.</li>
+        <li>The first time, Android asks you to allow installs from the browser. Allow it, then go back.</li>
+      </ol>
+      <div className="mt-1 text-sm text-ink/70">Progress, stickers and looks stay on this phone through the update.</div>
+      <button
+        disabled={opening}
+        onClick={async () => {
+          setOpening(true)
+          // Back up to the cloud first when signed in; never block the update on it.
+          await Promise.race([useSync.getState().push().catch(() => {}), new Promise((r) => setTimeout(r, 4000))])
+          openDownload(latest)
+          setOpening(false)
+        }}
+        className="btn btn-primary mt-3 w-full text-base"
+      >
+        {opening ? 'Opening…' : '⬇️ Download update'}
+      </button>
+    </div>
+  )
+}
+
+function AppCard() {
+  const enabled = useUpdate((s) => s.enabled)
+  const status = useUpdate((s) => s.status)
+  const current = useUpdate((s) => s.current)
+  const check = useUpdate((s) => s.check)
+  if (!enabled) return null
+  const message: Partial<Record<typeof status, string>> = {
+    checking: 'Checking…',
+    upToDate: 'This is the newest version.',
+    available: 'A new version is ready (see the top of this page).',
+    error: 'Could not check right now. Are you online?',
+  }
+  return (
+    <Card title="App">
+      <div className="font-bold">Version {current ? current.versionName : '…'}</div>
+      {message[status] && <div className="text-sm text-ink/60">{message[status]}</div>}
+      <button disabled={status === 'checking'} onClick={() => check(true)} className="btn btn-secondary mt-2 w-full text-base">
+        Check for updates
+      </button>
+    </Card>
   )
 }
 
@@ -493,8 +549,8 @@ function SettingsTab() {
     <>
       <Card title="Child">
         <div className="flex gap-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} className="flex-1 rounded-xl border-2 border-ink/20 px-3 py-2 text-base outline-none focus:border-grape" />
-          <button onClick={() => setChildName(name)} className="btn btn-secondary text-base">
+          <input value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-1 rounded-xl border-2 border-ink/20 px-3 py-2 text-base outline-none focus:border-grape" />
+          <button onClick={() => setChildName(name)} className="btn btn-secondary shrink-0 text-base">
             Save
           </button>
         </div>
@@ -529,6 +585,7 @@ function SettingsTab() {
           </div>
         )}
       </Card>
+      <AppCard />
       <Card title="Danger zone">
         {!confirmReset ? (
           <button onClick={() => setConfirmReset(true)} className="btn btn-warn w-full text-base">
