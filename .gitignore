@@ -38,5 +38,4 @@ android/app/*.iml
 android/capacitor-cordova-android-plugins
 
 # e2e output
-e2e/shots
-e2e/shots-seeded
+e2e/shots*/
