@@ -89,35 +89,44 @@ function readCurrent(): Promise<UpdateState['current']> {
 const enabled = Boolean(UPDATE_URL) && Capacitor.isNativePlatform()
 const cached = enabled ? readCache() : null
 
-export const useUpdate = create<UpdateState>((set, get) => ({
+export const useUpdate = create<UpdateState>(() => ({
   enabled,
   status: enabled ? 'idle' : 'disabled',
   current: null,
   latest: cached?.latest ?? null,
   lastCheckAt: cached?.at ?? null,
-  check: async (force = false) => {
-    if (!get().enabled || get().status === 'checking') return
-    const current = get().current ?? (await readCurrent())
-    set({ current })
-    const { lastCheckAt, latest: known } = get()
-    if (!force && lastCheckAt && Date.now() - lastCheckAt < CHECK_EVERY_MS) {
-      set({ status: isNewer(known, current) ? 'available' : 'upToDate' })
-      return
-    }
-    set({ status: 'checking' })
-    try {
-      // Native HTTP: the release download redirects to a CDN without CORS headers.
-      const res = await CapacitorHttp.get({ url: UPDATE_URL!, headers: { 'Cache-Control': 'no-cache' }, responseType: 'text', connectTimeout: 10000, readTimeout: 10000 })
-      const latest = res.status === 200 ? parseLatest(res.data) : null
-      if (!latest) throw new Error(`Unexpected response (${res.status})`)
-      const now = Date.now()
-      writeCache(now, latest)
-      set({ latest, lastCheckAt: now, status: isNewer(latest, current) ? 'available' : 'upToDate' })
-    } catch {
-      set({ status: isNewer(known, current) ? 'available' : 'error' })
-    }
+  check: (force = false) => {
+    if (!useUpdate.getState().enabled) return Promise.resolve()
+    // App start and the first "resume" event can ask at the same moment: share one request.
+    inflight ??= runCheck(force).finally(() => {
+      inflight = null
+    })
+    return inflight
   },
 }))
+
+let inflight: Promise<void> | null = null
+async function runCheck(force: boolean) {
+  const { setState: set } = useUpdate
+  const current = useUpdate.getState().current ?? (await readCurrent())
+  const { lastCheckAt, latest: known } = useUpdate.getState()
+  if (!force && lastCheckAt && Date.now() - lastCheckAt < CHECK_EVERY_MS) {
+    set({ current, status: isNewer(known, current) ? 'available' : 'upToDate' })
+    return
+  }
+  set({ current, status: 'checking' })
+  try {
+    // Native HTTP: the release download redirects to a CDN without CORS headers.
+    const res = await CapacitorHttp.get({ url: UPDATE_URL!, headers: { 'Cache-Control': 'no-cache' }, responseType: 'text', connectTimeout: 10000, readTimeout: 10000 })
+    const latest = res.status === 200 ? parseLatest(res.data) : null
+    if (!latest) throw new Error(`Unexpected response (${res.status})`)
+    const now = Date.now()
+    writeCache(now, latest)
+    set({ latest, lastCheckAt: now, status: isNewer(latest, current) ? 'available' : 'upToDate' })
+  } catch {
+    set({ status: isNewer(known, current) ? 'available' : 'error' })
+  }
+}
 
 /** Hand the APK link to Android: Capacitor opens non-app URLs in the default browser. */
 export function openDownload(latest: LatestBuild) {
