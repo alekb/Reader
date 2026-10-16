@@ -127,10 +127,12 @@ npm run audio -- --force      # regenerate everything
 npm run audio -- --only sounds --analyze   # regenerate the 66 sounds and print a frame-by-frame picture of each
 TTS_VOICE=en-US-Neural2-C npm run audio -- --force   # a different voice
 npm run audio:male            # the male set, into public/audio/male/
-TTS_VOICE=en-US-Neural2-D npm run audio:male -- --force   # a different male voice
+TTS_VOICE_MALE=en-US-Neural2-D npm run audio:male -- --force   # a different male voice
 ```
 
-**Without a local setup:** add `GOOGLE_TTS_API_KEY` as a repository secret, then Actions → **Generate voice clips** → Run workflow (pick the branch and the voice). It commits the new clips to that branch. Commits from the workflow don't start the APK build, so run "Android APK and web build" afterwards (or push any commit).
+`TTS_VOICE` only applies to the female set and `TTS_VOICE_MALE` to the male set. The generator refuses to add clips in a different voice to an existing set unless you pass `--force`, so voices never mix. Clip URLs in the manifest carry a content version (`?v=…`), so regenerated clips reach installed apps even though clips are cached for a year. A clip that fails to generate is left out of the manifest (the app falls back for it); run the generator again to fill it in.
+
+**Without a local setup:** add `GOOGLE_TTS_API_KEY` as a repository secret, then Actions → **Generate voice clips** → Run workflow (pick the branch and the voice). It commits the new clips to that branch, including a partial set if some clips failed. Commits from the workflow don't start the APK build, so run "Android APK and web build" afterwards (or push any commit).
 
 The consonant cutting was tuned on the female voice. After generating a male set, listen to the 66 sounds (`npm run audio:male -- --only sounds --analyze --force` prints a picture of each) before shipping. Each voice set adds about 12 MB to the app.
 

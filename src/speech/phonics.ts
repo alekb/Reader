@@ -7,7 +7,7 @@
  */
 import { GPC_BY_ID, LETTER_NAMES } from '../content/gpcs'
 import type { DecodableWord } from '../content/words'
-import { enqueue, getVoiceGender, nativeVoiceIndex, pause, playClip, setPhraseResolver, speak, webVoice, type VoiceGender } from './tts'
+import { enqueue, getVoiceGender, pause, playClip, setPhraseResolver, speak, speakNow, type VoiceGender } from './tts'
 import { getRecordingUrl } from './recordings'
 
 /**
@@ -25,17 +25,25 @@ const EMPTY: AudioManifest = { sounds: {}, letters: {}, words: {}, phrases: {} }
 const VOICE_DIR: Record<VoiceGender, string> = { female: 'audio/', male: 'audio/male/' }
 const manifests: Partial<Record<VoiceGender, Promise<AudioManifest>>> = {}
 function loadManifest(g: VoiceGender): Promise<AudioManifest> {
+  const cached = manifests[g]
+  if (cached) return cached
   const dir = `${import.meta.env.BASE_URL}${VOICE_DIR[g]}`
-  manifests[g] ??= fetch(`${dir}manifest.json`)
-    .then((r) => (r.ok ? r.json() : EMPTY))
-    .then((m: Partial<AudioManifest>) => {
+  const p: Promise<AudioManifest> = fetch(`${dir}manifest.json`)
+    .then(async (r) => {
+      // A voice set that was never generated comes back as 404 or as the app page: no clips.
+      const m: Partial<AudioManifest> = r.ok ? await r.json().catch(() => EMPTY) : EMPTY
       // Store full URLs so a clip always plays from its own voice's folder.
       const out: AudioManifest = { sounds: {}, letters: {}, words: {}, phrases: {} }
       for (const k of ['sounds', 'letters', 'words', 'phrases'] as const) for (const [key, f] of Object.entries(m[k] ?? {})) out[k][key] = dir + f
       return out
     })
-    .catch(() => EMPTY)
-  return manifests[g]
+    .catch(() => {
+      // Network failure: use the device voice for now and try again on the next clip.
+      if (manifests[g] === p) delete manifests[g]
+      return EMPTY
+    })
+  manifests[g] = p
+  return p
 }
 /** A bundled clip in the chosen voice. Words, letters and phrases missing from it use the device voice in the same gender. */
 async function bundled(kind: keyof AudioManifest, key: string): Promise<string | null> {
@@ -63,51 +71,14 @@ export function speakSound(gpcId: string, opts: { pauseAfter?: number } = {}): P
   return enqueue(async () => {
     const clip = await clipFor(gpcId)
     if (clip) await playClip(clip)
-    else await speakRaw(gpc.speak, gpc.stretchy)
+    else await speakInline(gpc.speak, gpc.stretchy)
     if (opts.pauseAfter) await new Promise((r) => setTimeout(r, opts.pauseAfter))
   })
 }
 
-async function speakRaw(text: string, stretchy: boolean) {
-  await new Promise<void>((resolve) => {
-    // Use the TTS queue directly but await inside this job: we are already on the chain.
-    speakInline(text, stretchy).then(resolve, () => resolve())
-  })
-}
-
-// A tiny inline speaker that bypasses the shared chain (we are inside a chain job already).
-import { Capacitor } from '@capacitor/core'
-import { TextToSpeech } from '@capacitor-community/text-to-speech'
-async function speakInline(text: string, stretchy: boolean) {
-  const rate = stretchy ? 0.7 : 0.8
-  if (Capacitor.isNativePlatform()) {
-    try {
-      await TextToSpeech.speak({ text, lang: 'en-US', rate, pitch: 1.05, voice: await nativeVoiceIndex(), category: 'playback' })
-    } catch {
-      /* ignore */
-    }
-    return
-  }
-  if (typeof speechSynthesis === 'undefined') return
-  await new Promise<void>((resolve) => {
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'en-US'
-    u.rate = rate
-    u.pitch = 1.05
-    const pref = webVoice()
-    if (pref) u.voice = pref
-    let done = false
-    const finish = () => {
-      if (!done) {
-        done = true
-        resolve()
-      }
-    }
-    u.onend = finish
-    u.onerror = finish
-    setTimeout(finish, 1800)
-    speechSynthesis.speak(u)
-  })
+/** Device voice inside a chain job; pure sounds are stretched a little slower. */
+function speakInline(text: string, stretchy: boolean): Promise<void> {
+  return speakNow(text, { rate: stretchy ? 0.7 : 0.8 })
 }
 
 /** Say the letter's name ("ess"). */

@@ -5,6 +5,8 @@
  */
 import { Capacitor } from '@capacitor/core'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
+import type { VoiceGender } from '../engine/types'
+import { voiceGenderOf } from './voiceNames'
 
 const isNative = Capacitor.isNativePlatform()
 
@@ -20,7 +22,7 @@ export function setVoiceRate(rate: number) {
   baseRate = rate
 }
 
-export type VoiceGender = 'female' | 'male'
+export type { VoiceGender }
 let gender: VoiceGender = 'female'
 /** Which voice the parent picked. Bundled clips and the device voice both follow it. */
 export function setVoiceGender(g: VoiceGender) {
@@ -44,24 +46,16 @@ let chain: Promise<void> = Promise.resolve()
 let preferredVoice: SpeechSynthesisVoice | null = null
 let voicesLoaded = false
 
-// Device voices rarely say their gender, so we go by well-known names.
-// Android's Google voices are codes: en-us-x-iol / iom / tpd are male.
-const MALE_VOICE = /\b(male|david|mark|guy|daniel|alex|fred|tom|aaron|arthur|evan|nathan|reed|rocko|eddy|grandpa|ryan|christopher|eric|andrew|brian|roger|steffan|davis|tony|jason)\b|en-us-x-(iol|iom|tpd)/i
-const FEMALE_VOICE = /\b(female|samantha|karen|moira|zira|aria|jenny|ava|allison|susan|victoria|tessa|serena|fiona|joanna|salli|kendra|kimberly|ivy|michelle|emma|nicky)\b|en-us-x-(iob|iog|sfg|tpc|tpf)/i
-
 function genderScore(name: string): number {
-  const male = MALE_VOICE.test(name)
-  const female = FEMALE_VOICE.test(name)
-  if (gender === 'male') return male ? 8 : female ? -8 : 0
-  return female ? 1 : male ? -8 : 0
+  const g = voiceGenderOf(name)
+  return g === gender ? 8 : g ? -8 : 0
 }
 
-/** Index of the best native (Android) male voice, or undefined for the system default (used for Female, as before). */
+/** Index of the best native (Android) voice for the chosen gender, or undefined for the system default. */
 let nativeVoice: Promise<number | undefined> | null = null
-export function nativeVoiceIndex(): Promise<number | undefined> {
-  if (gender === 'female') return Promise.resolve(undefined)
+function nativeVoiceIndex(): Promise<number | undefined> {
   if (!nativeVoice) {
-    nativeVoice = TextToSpeech.getSupportedVoices()
+    const p: Promise<number | undefined> = TextToSpeech.getSupportedVoices()
       .then(({ voices }) => {
         let best: number | undefined
         let bestScore = 0
@@ -79,12 +73,17 @@ export function nativeVoiceIndex(): Promise<number | undefined> {
         return best
       })
       .catch(() => undefined)
+    nativeVoice = p
+    // The engine may still be starting (empty list or an error): ask again next time.
+    p.then((i) => {
+      if (i === undefined && nativeVoice === p) nativeVoice = null
+    })
   }
   return nativeVoice
 }
 
-/** The browser voice for the chosen gender (used by phonics.ts too). */
-export function webVoice(): SpeechSynthesisVoice | null {
+/** The browser voice for the chosen gender. */
+function webVoice(): SpeechSynthesisVoice | null {
   if (!voicesLoaded) preferredVoice = pickVoice()
   return preferredVoice
 }
@@ -151,6 +150,15 @@ async function speakNative(text: string, opts: SpeakOptions, gen: number): Promi
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Speak with the device voice right now, not queued. For jobs already running
+ * on the chain (phonics.ts); `stopSpeaking()` still cancels it.
+ */
+export function speakNow(text: string, opts: SpeakOptions = {}): Promise<void> {
+  const gen = generation
+  return isNative ? speakNative(text, opts, gen) : speakWeb(text, opts, gen)
 }
 
 /** Speak text, queued after anything already speaking. */

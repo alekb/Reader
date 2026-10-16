@@ -23,11 +23,18 @@ on:
 permissions:
   contents: write
 
+# One generation per branch at a time, so pushes never race.
+concurrency:
+  group: audio-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, so the rebase before pushing always works
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -39,7 +46,10 @@ jobs:
         env:
           GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
         run: node scripts/generate-audio.mjs --voice ${{ inputs.voice }} ${{ inputs.force && '--force' || '' }}
+      # Save whatever was generated even if a few clips failed (they are left out of the
+      # manifest, so the app falls back for them); re-run the workflow to fill them in.
       - name: Commit clips
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
@@ -48,5 +58,6 @@ jobs:
             echo "No new clips."
           else
             git commit -m "Generate ${{ inputs.voice }} voice clips"
-            git push
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi

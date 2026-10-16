@@ -39,7 +39,8 @@ if (GENDER !== 'female' && GENDER !== 'male') {
   console.error('--voice must be female or male.')
   process.exit(1)
 }
-const VOICE = process.env.TTS_VOICE || (GENDER === 'male' ? 'en-US-Neural2-J' : 'en-US-Neural2-F')
+// Each set has its own override, so a female TTS_VOICE in .env never ends up in the male folder.
+const VOICE = GENDER === 'male' ? process.env.TTS_VOICE_MALE || 'en-US-Neural2-J' : process.env.TTS_VOICE || 'en-US-Neural2-F'
 const SR = 24000
 const OUT = path.resolve(GENDER === 'male' ? 'public/audio/male' : 'public/audio')
 const CONCURRENCY = 6
@@ -388,9 +389,13 @@ function finish(pcm, fadeIn, fadeOut) {
 }
 
 // ---------------------------------------------------------------- jobs
-const manifest = { voice: VOICE, gender: GENDER, sounds: {}, letters: {}, words: {}, phrases: {} }
+const manifest = { voice: VOICE, sounds: {}, letters: {}, words: {}, phrases: {} }
 const manifestFile = path.join(OUT, 'manifest.json')
 const existing = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, 'utf8')) : null
+if (existing?.voice && existing.voice !== VOICE && !FORCE) {
+  console.error(`${path.relative('.', OUT)} was generated with ${existing.voice}, not ${VOICE}. Add --force to regenerate it all, so voices don't mix.`)
+  process.exit(1)
+}
 
 function hash(s) {
   return crypto.createHash('sha1').update(s).digest('hex').slice(0, 16)
@@ -464,15 +469,24 @@ async function worker() {
     } catch (e) {
       failed++
       console.error(`FAILED ${job.kind}/${job.key}: ${e.message}`)
+      // Leave it out of the manifest (the app then falls back) unless an older clip is still there.
+      if (!fs.existsSync(file)) delete manifest[job.kind][job.key]
     }
   }
 }
 await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+// Version each URL by content: installed apps cache clips for a year, so a regenerated clip needs a new URL.
+for (const k of ['sounds', 'letters', 'words', 'phrases']) {
+  for (const [key, f] of Object.entries(manifest[k])) {
+    const file = path.join(OUT, f.split('?')[0])
+    if (fs.existsSync(file)) manifest[k][key] = `${f.split('?')[0]}?v=${hash(fs.readFileSync(file)).slice(0, 8)}`
+  }
+}
 fs.mkdirSync(OUT, { recursive: true })
 fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 1))
 // After a full run, delete clips that the manifest no longer references (removed words, old phrases).
 if (!ONLY) {
-  const referenced = new Set(['sounds', 'letters', 'words', 'phrases'].flatMap((k) => Object.values(manifest[k])))
+  const referenced = new Set(['sounds', 'letters', 'words', 'phrases'].flatMap((k) => Object.values(manifest[k]).map((f) => f.split('?')[0])))
   let pruned = 0
   for (const dir of ['sounds', 'letters', 'words', 'phrases']) {
     const abs = path.join(OUT, dir)

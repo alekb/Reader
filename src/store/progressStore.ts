@@ -214,7 +214,7 @@ export const useProgress = create<ProgressState>()(
       setSettings: (s) => {
         const p = get().progress
         if (!p) return
-        const settings = { ...p.settings, ...s }
+        const settings = { ...p.settings, ...s, changedAt: Date.now() }
         set({ progress: { ...p, settings, updatedAt: Date.now() }, dirty: get().dirty + 1 })
       },
 
@@ -281,7 +281,7 @@ export const useProgress = create<ProgressState>()(
 function applyAudioSettings(p: Progress) {
   setSfxEnabled(p.settings.sfx)
   setVoiceRate(p.settings.voiceRate)
-  setVoiceGender(p.settings.voice ?? 'female')
+  setVoiceGender(p.settings.voice)
 }
 
 // Re-apply on every change, so a cloud restore or sign-in picks up the parent's choices too.

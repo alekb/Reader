@@ -7,7 +7,7 @@ import { TRICKY_WORDS } from '../content/trickyWords'
 import { newItemPolicy, nextGpcToIntroduce, nextTrickyToIntroduce, summarize } from '../engine/curriculum'
 import { DAY_MS, dayKey, masteryOf } from '../engine/scheduler'
 import type { MasteryLevel } from '../engine/scheduler'
-import type { SessionLog } from '../engine/types'
+import type { SessionLog, VoiceGender } from '../engine/types'
 import { useProgress } from '../store/progressStore'
 import { useSync } from '../store/syncStore'
 import { isParentUnlocked } from './ParentGate'
@@ -490,7 +490,7 @@ function SettingsTab() {
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
   const [showRecorder, setShowRecorder] = useState(false)
-  const chooseVoice = (voice: 'female' | 'male') => {
+  const chooseVoice = (voice: VoiceGender) => {
     setSettings({ voice })
     // Let the parent hear the new voice straight away.
     stopSpeaking()
@@ -528,7 +528,7 @@ function SettingsTab() {
           <span>Voice</span>
           <div className="flex gap-2" role="radiogroup" aria-label="Voice">
             {(['female', 'male'] as const).map((v) => {
-              const on = (progress.settings.voice ?? 'female') === v
+              const on = progress.settings.voice === v
               return (
                 <button key={v} role="radio" aria-checked={on} onClick={() => chooseVoice(v)} className={`tile px-3 py-1 text-base ${on ? 'bg-sun font-bold ring-4 ring-grape' : ''}`}>
                   {v === 'female' ? 'Female' : 'Male'}

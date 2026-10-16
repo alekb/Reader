@@ -49,6 +49,8 @@ export function mergeProgress(localIn: Progress | null, remoteIn: Progress | nul
     stickers: [...new Set([...local.stickers, ...remote.stickers])],
     lastEggDay: local.lastEggDay > remote.lastEggDay ? local.lastEggDay : remote.lastEggDay,
     streak,
+    // Settings are the parent's choice, not play: keep whichever was changed last.
+    settings: remote.settings.changedAt > local.settings.changedAt ? remote.settings : local.settings.changedAt > remote.settings.changedAt ? local.settings : base.settings,
     createdAt: Math.min(local.createdAt, remote.createdAt),
     updatedAt: Math.max(local.updatedAt, remote.updatedAt),
   }
