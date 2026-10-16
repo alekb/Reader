@@ -11,6 +11,7 @@ import { ParentGate } from './screens/ParentGate'
 import { SessionComplete } from './screens/SessionComplete'
 import { Stickers } from './screens/Stickers'
 import { Wardrobe } from './screens/Wardrobe'
+import { WhoIsPlaying } from './screens/WhoIsPlaying'
 import { BackButton } from './components/BackButton'
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
           <>
             <Route path="/parent" element={<ParentGate />} />
             <Route path="/parent/dashboard" element={<Dashboard />} />
+            <Route path="/who" element={<WhoIsPlaying />} />
             <Route path="*" element={<Onboarding />} />
           </>
         ) : (
@@ -33,6 +35,7 @@ export default function App() {
             <Route path="/wardrobe" element={<Wardrobe />} />
             <Route path="/stickers" element={<Stickers />} />
             <Route path="/alphabet" element={<Alphabet />} />
+            <Route path="/who" element={<WhoIsPlaying />} />
             <Route path="/parent" element={<ParentGate />} />
             <Route path="/parent/dashboard" element={<Dashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />

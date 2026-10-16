@@ -5,16 +5,24 @@ import { applyAnswer, newItem } from './scheduler'
 
 export const DEFAULT_SETTINGS: Progress['settings'] = { sfx: true, voiceRate: 0.9, voice: 'female', changedAt: 0 }
 
-/** Fill in settings added after the progress was saved. */
-function withSettings(p: Progress): Progress {
-  const s = p.settings as Partial<Progress['settings']> | undefined
-  if (s && s.voice && typeof s.changedAt === 'number') return p
-  return { ...p, settings: { ...DEFAULT_SETTINGS, ...s } }
+/** The one child a device or account had before multiple children were supported. */
+export const LEGACY_CHILD_ID = 'main'
+
+export function newChildId(): string {
+  return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function createProgress(childName: string, character: CharacterBase, now: number): Progress {
+/** Fill in fields added after the progress was saved. */
+function backfill(p: Progress): Progress {
+  const s = p.settings as Partial<Progress['settings']> | undefined
+  if (s && s.voice && typeof s.changedAt === 'number' && typeof p.id === 'string' && p.id) return p
+  return { ...p, id: typeof p.id === 'string' && p.id ? p.id : LEGACY_CHILD_ID, settings: { ...DEFAULT_SETTINGS, ...s } }
+}
+
+export function createProgress(childName: string, character: CharacterBase, now: number, id: string = newChildId()): Progress {
   return {
     version: 2,
+    id,
     childName,
     character,
     look: defaultLook(character),
@@ -95,13 +103,13 @@ export function migrateProgress(raw: unknown): Progress | null {
   if (!raw || typeof raw !== 'object') return null
   const p = raw as Record<string, unknown>
   if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) {
-    const cur = withSettings(p as unknown as Progress)
+    const cur = backfill(p as unknown as Progress)
     const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds()])]
     return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
   }
   const base = (['robot', 'dragon', 'monster'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
-  const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()))
-  const out: Progress = { ...withSettings({ ...fresh, ...(p as Partial<Progress>) }), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
+  const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()), LEGACY_CHILD_ID)
+  const out: Progress = { ...backfill({ ...fresh, ...(p as Partial<Progress>) }), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
   // Translate the old skin catalogue (v1) into parts.
   const oldSkins: string[] = Array.isArray(p.unlockedSkins) ? (p.unlockedSkins as string[]) : []
   const accessoryToPart: Record<string, string> = {

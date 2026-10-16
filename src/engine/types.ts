@@ -23,6 +23,12 @@ export interface ItemState {
 
 export interface Progress {
   version: 2
+  /**
+   * Which child this is. The child saved before multiple children existed is
+   * LEGACY_CHILD_ID on every device (cloud: users/{uid}); the rest have random
+   * ids (cloud: users/{uid}/children/{id}).
+   */
+  id: string
   childName: string
   character: CharacterBase
   /** What the buddy is wearing (one part per slot). */
@@ -92,4 +98,10 @@ export interface ActivityResult {
   scheduled?: boolean
   /** True for nonsense words (not counted as known words). */
   nonsense?: boolean
+}
+
+/** One child's saved data. */
+export interface ChildRecord {
+  progress: Progress
+  sessions: SessionLog[]
 }

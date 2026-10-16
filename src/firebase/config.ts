@@ -1,8 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app'
 import type { FirebaseApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { connectAuthEmulator, getAuth } from 'firebase/auth'
 import type { Auth } from 'firebase/auth'
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 import type { Firestore } from 'firebase/firestore'
 
 const env = import.meta.env
@@ -31,6 +31,9 @@ export const firebaseConfig = {
   appId: (env.VITE_FIREBASE_APP_ID as string | undefined) || PROJECT.appId,
 }
 
+/** Local testing only: use the Firebase emulators on this host (auth :9099, Firestore :8080). */
+const emulatorHost = env.VITE_FIREBASE_EMULATOR_HOST as string | undefined
+
 /** True when a Firebase project is configured. */
 export const firebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId)
 
@@ -47,6 +50,10 @@ export function getFirebase(): { app: FirebaseApp; auth: Auth; db: Firestore } |
       db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
     } catch {
       db = initializeFirestore(app, {})
+    }
+    if (emulatorHost) {
+      connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true })
+      connectFirestoreEmulator(db, emulatorHost, 8080)
     }
   }
   return { app, auth: auth!, db: db! }

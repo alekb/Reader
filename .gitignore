@@ -39,3 +39,6 @@ android/capacitor-cordova-android-plugins
 
 # e2e output
 e2e/shots*/
+
+# Firebase emulator logs
+*-debug.log
