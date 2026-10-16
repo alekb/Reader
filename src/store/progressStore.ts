@@ -292,7 +292,8 @@ export const useProgress = create<ProgressState>()(
 
       setChildren: (children) => {
         const s = get()
-        const others = { ...children }
+        // Cap every child's local history like the one playing (the cloud keeps everything).
+        const others = Object.fromEntries(Object.entries(children).map(([id, c]) => [id, { ...c, sessions: c.sessions.slice(-400) }]))
         // A parent in the middle of adding a child stays on the welcome screen.
         const adding = !s.progress && Object.keys(s.others).length > 0
         // Keep the same child playing; otherwise the oldest one (the picker lets them change).
@@ -302,7 +303,7 @@ export const useProgress = create<ProgressState>()(
         const same = active && s.progress?.id === active.progress.id
         set({
           progress: active?.progress ?? null,
-          sessions: active?.sessions.slice(-400) ?? [],
+          sessions: active?.sessions ?? [],
           others,
           active: same ? s.active : null,
           lastSummary: same ? s.lastSummary : null,

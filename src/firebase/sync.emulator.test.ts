@@ -70,16 +70,16 @@ describe.skipIf(!host || !authHost)('cloud sync with several children (emulator)
     const remote = await fetchRemote(a.db, a.uid)
     expect(remote.children.kid2).toEqual({ progress: null, sessions: [], resetAt: 1000 })
     expect((await fetchMarkers(a.db, a.uid, ['kid2'])).resetAt.kid2).toBe(1000)
-    // Another device still has the old Mia: it is dropped, Leo is kept.
+    // Another device still has the old Mia: she starts over there too, Leo is kept.
     const merged = mergeAccount({ kid2: child('Mia', 'kid2', 50, 10), [LEGACY_CHILD_ID]: child('Leo', LEGACY_CHILD_ID, 9) }, remote)
-    expect(Object.keys(merged)).toEqual([LEGACY_CHILD_ID])
+    expect([merged.kid2.progress.xp, merged.kid2.progress.createdAt, merged[LEGACY_CHILD_ID].progress.xp]).toEqual([0, 1000, 9])
     // The fresh copy uploads next to the marker.
     await pushChild(a.db, a.uid, child('Mia', 'kid2', 0, 2000))
     expect((await fetchRemote(a.db, a.uid)).children.kid2.progress?.childName).toBe('Mia')
   })
 
   it('removing a child deletes it and is remembered, without touching the first child', async () => {
-    await removeCloudChild(a.db, a.uid, 'kid2')
+    await removeCloudChild(a.db, a.uid, child('Mia', 'kid2', 0, 2000).progress)
     expect((await getDoc(doc(a.db, 'users', a.uid, 'children', 'kid2'))).exists()).toBe(false)
     expect((await getDocs(collection(a.db, `users/${a.uid}/children/kid2/sessions`))).size).toBe(0)
     const remote = await fetchRemote(a.db, a.uid)
@@ -88,12 +88,18 @@ describe.skipIf(!host || !authHost)('cloud sync with several children (emulator)
     expect(Object.keys(mergeAccount({ kid2: child('Mia', 'kid2') }, remote))).toEqual([LEGACY_CHILD_ID])
   })
 
-  it('starting the first child over keeps the removal list', async () => {
-    await resetCloudChild(a.db, a.uid, LEGACY_CHILD_ID, 3000)
-    const data = (await getDoc(doc(a.db, 'users', a.uid))).data()!
-    expect(data.progress).toBeUndefined()
-    expect(data.resetAt).toBe(3000)
-    expect(data.removedChildren).toEqual(['kid2'])
+  it('a one-child version resetting (overwriting users/{uid}) keeps the removal list', async () => {
+    await setDoc(doc(a.db, 'users', a.uid), { resetAt: 3000 })
+    expect((await fetchRemote(a.db, a.uid)).removed).toEqual(['kid2'])
+  })
+
+  it('removing the first child remembers which one it was', async () => {
+    await pushChild(a.db, a.uid, child('Leo', LEGACY_CHILD_ID, 5, 4000))
+    await removeCloudChild(a.db, a.uid, child('Leo', LEGACY_CHILD_ID, 5, 4000).progress)
+    const remote = await fetchRemote(a.db, a.uid)
+    expect(remote.removed).toEqual(['kid2', `${LEGACY_CHILD_ID}@4000`])
+    expect(remote.children[LEGACY_CHILD_ID]?.progress ?? null).toBeNull()
+    expect((await getDoc(doc(a.db, 'users', a.uid))).data()?.resetAt).toBe(3000)
   })
 
   it("rules keep each account's children private and well-formed", async () => {
@@ -101,12 +107,14 @@ describe.skipIf(!host || !authHost)('cloud sync with several children (emulator)
     await expect(getDoc(doc(b.db, 'users', a.uid, 'children', 'kid3'))).rejects.toMatchObject({ code: 'permission-denied' })
     await expect(pushChild(b.db, a.uid, child('Evil', 'kid4'))).rejects.toMatchObject({ code: 'permission-denied' })
     await expect(setDoc(doc(a.db, 'users', a.uid, 'children', 'kid3'), { progress: {}, junk: 1 })).rejects.toMatchObject({ code: 'permission-denied' })
-    await expect(setDoc(doc(a.db, 'users', a.uid), { removedChildren: 'kid3' }, { merge: true })).rejects.toMatchObject({ code: 'permission-denied' })
+    await expect(setDoc(doc(a.db, 'users', a.uid, 'meta', 'removed'), { ids: 'kid3' })).rejects.toMatchObject({ code: 'permission-denied' })
+    await expect(getDoc(doc(b.db, 'users', a.uid, 'meta', 'removed'))).rejects.toMatchObject({ code: 'permission-denied' })
   })
 
   it('deleting the account removes every child', async () => {
     await deleteAllCloudData(a.db, a.uid)
     expect(await fetchRemote(a.db, a.uid)).toEqual({ children: {}, removed: [] })
     expect((await getDocs(collection(a.db, `users/${a.uid}/children`))).size).toBe(0)
+    expect((await getDoc(doc(a.db, 'users', a.uid, 'meta', 'removed'))).exists()).toBe(false)
   })
 })

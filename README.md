@@ -66,10 +66,11 @@ Account safety built in: a device never mixes two parent accounts (signing in wi
 Data layout in Firestore:
 
 ```
-users/{uid}                                  { progress, updatedAt, resetAt, removedChildren }  the first child
-users/{uid}/sessions/{id}                    the first child's sessions (duration, accuracy, new items...)
+users/{uid}                                  { progress, updatedAt, resetAt }  the child from before several children
+users/{uid}/sessions/{id}                    that child's sessions (duration, accuracy, new items...)
 users/{uid}/children/{childId}               { progress, updatedAt, resetAt }  every other child
 users/{uid}/children/{childId}/sessions/{id} that child's sessions
+users/{uid}/meta/removed                     { ids } children removed on any device, so no device uploads them again
 users/{uid}/recordings/{key}                 parent-recorded sound clips (base64), shared by all children
 ```
 
@@ -157,7 +158,7 @@ Each parent account can hold up to 8 children, each with their own progress, bud
 - **The dashboard** shows one child at a time: tap a name at the top to see that child (that child also becomes the one playing).
 - **Start over / remove** a child in Parents → Settings → Danger zone. Starting over keeps the name, buddy and settings.
 
-The child from before this feature keeps its place in the cloud (`users/{uid}`), so an older version of the app on another device still shows that child.
+The child from before this feature keeps its place in the cloud (`users/{uid}`), so an older version of the app on another device still shows that child. Children added later only appear in the updated app.
 
 ## Parent dashboard
 

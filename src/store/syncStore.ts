@@ -5,7 +5,7 @@ import { create } from 'zustand'
 import { EmailAuthProvider, createUserWithEmailAndPassword, deleteUser, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as fbSignOut } from 'firebase/auth'
 import type { Firestore } from 'firebase/firestore'
 import { firebaseEnabled, getFirebase } from '../firebase/config'
-import { deleteAllCloudData, deleteRemoteRecording, fetchMarkers, fetchRecordings, fetchRemote, mergeAccount, pushChild, pushRecording, removeCloudChild, requireServer, resetCloudChild } from '../firebase/sync'
+import { deleteAllCloudData, deleteRemoteRecording, fetchMarkers, fetchRecordings, fetchRemote, mergeAccount, pushChild, pushRecording, removalKey, removeCloudChild, requireServer, resetCloudChild } from '../firebase/sync'
 import { allChildren, useProgress } from './progressStore'
 import { base64ToBlob, blobToBase64, clearRecordings, hasRecording, saveRecording } from '../speech/recordings'
 
@@ -79,6 +79,7 @@ function friendly(e: unknown): string {
     'auth/too-many-requests': 'Too many attempts. Please wait a bit and try again.',
     'auth/requires-recent-login': 'Please sign in again, then retry.',
     'auth/missing-password': 'Please enter your password.',
+    'permission-denied': 'The cloud backup refused this change. Make sure the latest firestore.rules are deployed, then try again.',
   }
   return map[code] ?? (e instanceof Error ? e.message : 'Something went wrong.')
 }
@@ -102,8 +103,15 @@ async function cloudFirst(user: { uid: string } | null, change: (db: Firestore, 
   if (!fb || !user) return
   await withTimeout(requireServer(fb.db, user.uid), 8000, OFFLINE)
   await quiesce()
-  // If the connection drops now, the writes stay queued and finish once online.
-  await withTimeout(change(fb.db, user.uid), 20000, OFFLINE).catch(() => {})
+  try {
+    await withTimeout(change(fb.db, user.uid), 20000, OFFLINE)
+  } catch (e) {
+    // The connection dropped part way: the writes stay queued and finish once online.
+    if (e instanceof Error && e.message === OFFLINE) return
+    // Refused (e.g. security rules not deployed): change nothing here either.
+    wiping = false
+    throw new Error(friendly(e))
+  }
 }
 
 /** Stop scheduled pushes and wait for one already running. */
@@ -211,14 +219,14 @@ export const useSync = create<SyncState>()((set, get) => ({
       try {
         // Never upload a child that was removed, or started over, on another device after this copy was made.
         const markers = await fetchMarkers(fb.db, user.uid, ids).catch(() => null)
-        const gone = ids.filter((id) => markers && (markers.removed.includes(id) || children[id].progress.createdAt < (markers.resetAt[id] ?? 0)))
-        if (gone.length) {
-          for (const id of gone) useProgress.getState().removeChild(id)
-          stale = true
-        }
+        const removed = ids.filter((id) => markers?.removed.includes(removalKey(children[id].progress)))
+        const restarted = ids.filter((id) => children[id].progress.createdAt < (markers?.resetAt[id] ?? 0))
+        for (const id of removed) useProgress.getState().removeChild(id)
+        // A child started over elsewhere is fetched again (the next pull starts it over here too).
+        if (restarted.length) stale = true
         for (const id of ids) {
           if (wiping) return
-          if (gone.includes(id)) continue
+          if (removed.includes(id) || restarted.includes(id)) continue
           await pushChild(fb.db, user.uid, children[id])
           pushedAt[id] = children[id].progress.updatedAt
         }
@@ -261,7 +269,9 @@ export const useSync = create<SyncState>()((set, get) => ({
   },
 
   removeChild: async (id) => {
-    await cloudFirst(get().user, (db, uid) => removeCloudChild(db, uid, id))
+    const child = allChildren(useProgress.getState())[id]
+    if (!child) return
+    await cloudFirst(get().user, (db, uid) => removeCloudChild(db, uid, child.progress))
     useProgress.getState().removeChild(id)
     delete pushedAt[id]
     wiping = false

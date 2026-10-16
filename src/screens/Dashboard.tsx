@@ -103,6 +103,7 @@ function ChildBar() {
       {children.length < MAX_CHILDREN && (
         <button
           onClick={() => {
+            markPicked()
             addChild()
             nav('/', { replace: true })
           }}

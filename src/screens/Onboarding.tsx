@@ -18,8 +18,8 @@ export function Onboarding() {
   const otherCount = useProgress((s) => Object.keys(s.others).length)
   const [name, setName] = useState('')
   const [base, setBase] = useState<CharacterBase | null>(null)
-  // The app was closed while adding a child: let the children pick first.
-  if (needsPick(otherCount)) return <Navigate to="/who" replace />
+  // The app was closed while adding a child: back to the children who already play.
+  if (needsPick(otherCount + 1)) return <Navigate to="/who" replace />
 
   return (
     <Screen className="items-center gap-5 px-5 pb-10 pt-10">

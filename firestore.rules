@@ -5,14 +5,13 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // One document per parent account holding the first child's progress, and
-    // the list of children removed on any device.
+    // One document per parent account holding the progress of the child from
+    // before several children were supported.
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
       allow create, update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['progress', 'updatedAt', 'resetAt', 'email', 'removedChildren'])
-        && (!('progress' in request.resource.data) || request.resource.data.progress is map)
-        && (!('removedChildren' in request.resource.data) || (request.resource.data.removedChildren is list && request.resource.data.removedChildren.size() <= 200));
+        && request.resource.data.keys().hasOnly(['progress', 'updatedAt', 'resetAt', 'email'])
+        && (!('progress' in request.resource.data) || request.resource.data.progress is map);
 
       // One document per learning session (small logs).
       match /sessions/{sessionId} {
@@ -35,6 +34,15 @@ service cloud.firestore {
             && request.resource.data.id == sessionId
             && request.resource.data.keys().size() < 30;
         }
+      }
+
+      // Children removed on any device, so other devices do not upload them again.
+      match /meta/removed {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['ids'])
+          && request.resource.data.ids is list
+          && request.resource.data.ids.size() <= 500;
       }
 
       // Parent voice recordings of the letter sounds (short clips, base64).

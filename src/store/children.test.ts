@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { childList, useProgress } from './progressStore'
 import { createProgress, LEGACY_CHILD_ID, migrateProgress } from '../engine/progress'
-import { mergeAccount } from '../firebase/sync'
+import { mergeAccount, removalKey } from '../firebase/sync'
 import type { ChildRecord, Progress } from '../engine/types'
 
 const S = () => useProgress.getState()
@@ -83,8 +83,17 @@ describe('cloud merge with several children', () => {
     const local = rec('Leo', 'a', 1, 99)
     const fresh = rec('Leo', 'a', 500, 0)
     expect(mergeAccount({ a: local }, { children: { a: remote(fresh, 400) }, removed: [] }).a.progress.xp).toBe(0)
-    // Reset in the cloud but the new copy not uploaded yet: drop the old one here.
-    expect(mergeAccount({ a: local }, { children: { a: { progress: null, sessions: [], resetAt: 400 } }, removed: [] })).toEqual({})
+    // Reset in the cloud but the new copy not uploaded yet: start over here too, keeping the child.
+    const restarted = mergeAccount({ a: local }, { children: { a: { progress: null, sessions: [], resetAt: 400 } }, removed: [] }).a.progress
+    expect([restarted.childName, restarted.xp, restarted.createdAt]).toEqual(['Leo', 0, 400])
+  })
+
+  it('a removed first child does not hide a different first child from another device', () => {
+    const removedLeo = rec('Leo', LEGACY_CHILD_ID, 100)
+    const otherMain = rec('Ava', LEGACY_CHILD_ID, 200)
+    const remote = { children: {}, removed: [removalKey(removedLeo.progress)] }
+    expect(mergeAccount({ [LEGACY_CHILD_ID]: removedLeo }, remote)).toEqual({})
+    expect(mergeAccount({ [LEGACY_CHILD_ID]: otherMain }, remote)[LEGACY_CHILD_ID].progress.childName).toBe('Ava')
   })
 
   it('gives progress saved before multiple children the shared first-child id', () => {

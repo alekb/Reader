@@ -1,19 +1,21 @@
 /**
  * Cloud persistence: Firestore documents under users/{uid}.
- *   users/{uid}                                   -> { progress, updatedAt, resetAt, removedChildren }
- *   users/{uid}/sessions/{sessionId}              -> SessionLog          (first child)
- *   users/{uid}/children/{childId}                -> { progress, updatedAt, resetAt }
- *   users/{uid}/children/{childId}/sessions/{id}  -> SessionLog          (other children)
+ *   users/{uid}                                   -> { progress, updatedAt, resetAt }   (the child from before several children)
+ *   users/{uid}/sessions/{sessionId}              -> SessionLog
+ *   users/{uid}/children/{childId}                -> { progress, updatedAt, resetAt }   (every other child)
+ *   users/{uid}/children/{childId}/sessions/{id}  -> SessionLog
+ *   users/{uid}/meta/removed                      -> { ids }   children removed on any device
  *   users/{uid}/recordings/{key}                  -> { b64, type, updatedAt }  (shared)
- * The first child (LEGACY_CHILD_ID) stays at users/{uid}, where versions with
- * one child keep it, so those versions keep working. `removedChildren` lists
- * children removed on any device, so another device never uploads them again.
+ * The child saved before several children were supported (LEGACY_CHILD_ID) stays at
+ * users/{uid}, where one-child versions of the app keep it, so they still show that child.
+ * The removal list has its own document because a one-child version overwrites users/{uid}
+ * when it resets. Local data is the source of truth while offline; on sign-in we merge.
  * Local data is the source of truth while offline; on sign-in we merge.
  */
 import { arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocFromServer, getDocs, setDoc, writeBatch } from 'firebase/firestore'
 import type { DocumentReference, Firestore } from 'firebase/firestore'
 import type { ChildRecord, ItemState, Progress, SessionLog } from '../engine/types'
-import { LEGACY_CHILD_ID, migrateProgress } from '../engine/progress'
+import { createProgress, LEGACY_CHILD_ID, migrateProgress } from '../engine/progress'
 
 function mergeItems(a: Record<string, ItemState>, b: Record<string, ItemState>): Record<string, ItemState> {
   const out: Record<string, ItemState> = { ...a }
@@ -78,20 +80,31 @@ export interface RemoteChild {
 
 export interface RemoteAccount {
   children: Record<string, RemoteChild>
-  /** Children removed on some device. */
+  /** Children removed on some device, as removalKey()s. */
   removed: string[]
+}
+
+/**
+ * How a removed child is remembered. Every device's child from before several children
+ * shares LEGACY_CHILD_ID, so that one is told apart by when it was created.
+ */
+export function removalKey(p: Progress): string {
+  return p.id === LEGACY_CHILD_ID ? `${LEGACY_CHILD_ID}@${p.createdAt}` : p.id
 }
 
 /** Combine the children on this device with the cloud copy, without losing work done on either side. */
 export function mergeAccount(local: Record<string, ChildRecord>, remote: RemoteAccount): Record<string, ChildRecord> {
   const out: Record<string, ChildRecord> = {}
+  const gone = (p: Progress) => remote.removed.includes(removalKey(p))
   for (const id of new Set([...Object.keys(local), ...Object.keys(remote.children)])) {
-    if (remote.removed.includes(id)) continue
-    const l = local[id]
+    const l = local[id] && !gone(local[id].progress) ? local[id] : null
     const r = remote.children[id]
-    const cloud = r?.progress ? { progress: r.progress, sessions: r.sessions } : null
-    if (!l || (r?.resetAt && l.progress.createdAt < r.resetAt)) {
-      // Only in the cloud, or started over on another device after this copy was made.
+    const cloud = r?.progress && !gone(r.progress) ? { progress: r.progress, sessions: r.sessions.slice(-400) } : null
+    if (l && r?.resetAt && l.progress.createdAt < r.resetAt) {
+      // Started over on another device after this copy was made: take the new copy, or start over here too.
+      const p = l.progress
+      out[id] = cloud ?? { progress: { ...createProgress(p.childName, p.character, r.resetAt, id), settings: p.settings, dailyGoalMin: p.dailyGoalMin }, sessions: [] }
+    } else if (!l) {
       if (cloud) out[id] = cloud
     } else if (!cloud) out[id] = l
     else out[id] = { progress: mergeProgress(l.progress, cloud.progress)!, sessions: mergeSessions(l.sessions, cloud.sessions).slice(-400) }
@@ -117,17 +130,26 @@ function remoteChild(data: Record<string, unknown>, id: string, sessions: Sessio
   return { progress, sessions, resetAt: Number(data.resetAt ?? 0) }
 }
 
+function removedDoc(db: Firestore, uid: string): DocumentReference {
+  return doc(db, 'users', uid, 'meta', 'removed')
+}
+
+function removedIds(data: Record<string, unknown> | undefined): string[] {
+  return Array.isArray(data?.ids) ? (data.ids as string[]) : []
+}
+
 export async function fetchRemote(db: Firestore, uid: string): Promise<RemoteAccount> {
-  const main = await getDoc(doc(db, 'users', uid))
+  const [main, kids, removed] = await Promise.all([getDoc(doc(db, 'users', uid)), getDocs(collection(db, 'users', uid, 'children')), getDoc(removedDoc(db, uid))])
+  const docs: [string, Record<string, unknown>][] = kids.docs.map((k) => [k.id, k.data()])
   const data = main.exists() ? main.data() : {}
+  if (data.progress || data.resetAt) docs.unshift([LEGACY_CHILD_ID, data])
   const children: Record<string, RemoteChild> = {}
-  if (data.progress || data.resetAt) children[LEGACY_CHILD_ID] = remoteChild(data, LEGACY_CHILD_ID, data.progress ? await fetchSessions(db, uid, LEGACY_CHILD_ID) : [])
-  const kids = await getDocs(collection(db, 'users', uid, 'children'))
-  for (const k of kids.docs) {
-    const d = k.data()
-    children[k.id] = remoteChild(d, k.id, d.progress ? await fetchSessions(db, uid, k.id) : [])
-  }
-  return { children, removed: Array.isArray(data.removedChildren) ? (data.removedChildren as string[]) : [] }
+  await Promise.all(
+    docs.map(async ([id, d]) => {
+      children[id] = remoteChild(d, id, d.progress ? await fetchSessions(db, uid, id) : [])
+    }),
+  )
+  return { children, removed: removedIds(removed.data()) }
 }
 
 /**
@@ -135,17 +157,12 @@ export async function fetchRemote(db: Firestore, uid: string): Promise<RemoteAcc
  * so a push never uploads a child that was removed or started over elsewhere.
  */
 export async function fetchMarkers(db: Firestore, uid: string, ids: string[]): Promise<{ removed: string[]; resetAt: Record<string, number> }> {
-  const main = await getDocFromServer(doc(db, 'users', uid))
-  const data = main.exists() ? main.data() : {}
+  const [removed, ...snaps] = await Promise.all([getDocFromServer(removedDoc(db, uid)), ...ids.map((id) => getDocFromServer(childDoc(db, uid, id)))])
   const resetAt: Record<string, number> = {}
-  for (const id of ids) {
-    if (id === LEGACY_CHILD_ID) resetAt[id] = Number(data.resetAt ?? 0)
-    else {
-      const c = await getDocFromServer(childDoc(db, uid, id))
-      resetAt[id] = c.exists() ? Number(c.data().resetAt ?? 0) : 0
-    }
-  }
-  return { removed: Array.isArray(data.removedChildren) ? (data.removedChildren as string[]) : [], resetAt }
+  ids.forEach((id, i) => {
+    resetAt[id] = snaps[i].exists() ? Number(snaps[i].data()?.resetAt ?? 0) : 0
+  })
+  return { removed: removedIds(removed.data()), resetAt }
 }
 
 /** Throws unless the server is reachable right now (used before destructive operations). */
@@ -194,7 +211,7 @@ async function deleteCollection(db: Firestore, path: string): Promise<void> {
   }
 }
 
-/** Remove a child's progress and sessions, keeping (or setting) the markers on the main document. */
+/** Remove a child's progress and sessions; with resetAt, leave a marker that it was started over. */
 async function clearChild(db: Firestore, uid: string, id: string, resetAt: number | null): Promise<void> {
   if (id === LEGACY_CHILD_ID) {
     await setDoc(doc(db, 'users', uid), { progress: deleteField(), updatedAt: deleteField(), ...(resetAt ? { resetAt } : {}) }, { merge: true })
@@ -212,9 +229,9 @@ export async function resetCloudChild(db: Firestore, uid: string, id: string, re
 }
 
 /** Remove one child from the cloud, and tell other devices it is gone. */
-export async function removeCloudChild(db: Firestore, uid: string, id: string): Promise<void> {
-  await setDoc(doc(db, 'users', uid), { removedChildren: arrayUnion(id) }, { merge: true })
-  await clearChild(db, uid, id, null)
+export async function removeCloudChild(db: Firestore, uid: string, child: Progress): Promise<void> {
+  await setDoc(removedDoc(db, uid), { ids: arrayUnion(removalKey(child)) }, { merge: true })
+  await clearChild(db, uid, child.id, null)
 }
 
 /** Remove everything stored for this account. */
@@ -226,6 +243,7 @@ export async function deleteAllCloudData(db: Firestore, uid: string): Promise<vo
     await deleteCollection(db, sessionsPath(uid, k.id))
     await deleteDoc(k.ref)
   }
+  await deleteDoc(removedDoc(db, uid))
   await deleteDoc(doc(db, 'users', uid))
 }
 
