@@ -2,6 +2,8 @@ import type { CharacterBase } from '../content/characters'
 import type { Look } from '../content/parts'
 
 /** Leitner-box state for one learnable item (a GPC or a tricky word). */
+export type VoiceGender = 'female' | 'male'
+
 export interface ItemState {
   /** 0 = brand new, 6 = long-term maintenance. */
   box: number
@@ -50,8 +52,8 @@ export interface Progress {
   streak: { count: number; lastDay: string }
   /** Minutes per day target shown to the child. */
   dailyGoalMin: number
-  /** Audio settings */
-  settings: { sfx: boolean; voiceRate: number }
+  /** Audio settings. `changedAt` lets sync keep the latest choice even when another device played since. */
+  settings: { sfx: boolean; voiceRate: number; voice: VoiceGender; changedAt: number }
   createdAt: number
   updatedAt: number
 }

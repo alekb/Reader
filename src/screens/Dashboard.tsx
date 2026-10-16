@@ -7,11 +7,13 @@ import { TRICKY_WORDS } from '../content/trickyWords'
 import { newItemPolicy, nextGpcToIntroduce, nextTrickyToIntroduce, summarize } from '../engine/curriculum'
 import { DAY_MS, dayKey, masteryOf } from '../engine/scheduler'
 import type { MasteryLevel } from '../engine/scheduler'
-import type { SessionLog } from '../engine/types'
+import type { SessionLog, VoiceGender } from '../engine/types'
 import { useProgress } from '../store/progressStore'
 import { useSync } from '../store/syncStore'
 import { openDownload, useUpdate } from '../store/updateStore'
 import { isParentUnlocked } from './ParentGate'
+import { say } from '../speech/phonics'
+import { stopSpeaking } from '../speech/tts'
 
 type Tab = 'progress' | 'activity' | 'sounds' | 'account' | 'settings'
 
@@ -544,6 +546,12 @@ function SettingsTab() {
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
   const [showRecorder, setShowRecorder] = useState(false)
+  const chooseVoice = (voice: VoiceGender) => {
+    setSettings({ voice })
+    // Let the parent hear the new voice straight away.
+    stopSpeaking()
+    say('Great work!')
+  }
 
   return (
     <>
@@ -572,6 +580,19 @@ function SettingsTab() {
           <span>Sound effects</span>
           <input type="checkbox" checked={progress.settings.sfx} onChange={(e) => setSettings({ sfx: e.target.checked })} className="h-6 w-6" />
         </label>
+        <div className="flex items-center justify-between py-1">
+          <span>Voice</span>
+          <div className="flex gap-2" role="radiogroup" aria-label="Voice">
+            {(['female', 'male'] as const).map((v) => {
+              const on = progress.settings.voice === v
+              return (
+                <button key={v} role="radio" aria-checked={on} onClick={() => chooseVoice(v)} className={`tile px-3 py-1 text-base ${on ? 'bg-sun font-bold ring-4 ring-grape' : ''}`}>
+                  {v === 'female' ? 'Female' : 'Male'}
+                </button>
+              )
+            })}
+          </div>
+        </div>
         <label className="flex items-center justify-between py-1">
           <span>Voice speed</span>
           <input type="range" min={0.6} max={1.2} step={0.05} value={progress.settings.voiceRate} onChange={(e) => setSettings({ voiceRate: Number(e.target.value) })} />

@@ -114,7 +114,9 @@ The app is a PWA: on Android Chrome it can be installed to the home screen. The 
 
 ## Audio: studio voice, bundled and offline
 
-All sounds, letter names, words, sentences and the mascot's lines are pre-generated with **Google Cloud Text-to-Speech** (voice `en-US-Neural2-F`) and shipped in `public/audio/` with a `manifest.json`. The app plays these clips first, on the web and on Android, so speech is consistent, works offline and needs no API key at runtime. Anything not in the manifest (for example a sentence that includes the child's name) falls back to the device's own voice.
+All sounds, letter names, words, sentences and the mascot's lines are pre-generated with **Google Cloud Text-to-Speech** and shipped with a `manifest.json` per voice: female (`en-US-Neural2-F`) in `public/audio/`, male (`en-US-Neural2-J`) in `public/audio/male/`. The app plays these clips first, on the web and on Android, so speech is consistent, works offline and needs no API key at runtime. Anything not in the manifest (for example a sentence that includes the child's name) falls back to the device's own voice.
+
+**Female or male voice:** parents choose in Parents → **Settings** → **Voice**. The choice syncs with the rest of the settings, and the device-voice fallback follows it too (it picks a male or female system voice where the device has one). If the male clip set has not been generated yet, Male uses the device's male voice, except for the pure letter sounds, which keep the female studio clips because device voices cannot say a clipped "t".
 
 Pure consonant sounds are the hard part: TTS engines cannot say a lone "t". The generator (`scripts/generate-audio.mjs`) synthesizes each consonant inside a syllable from IPA and cuts the vowel off with a band-energy analysis, so you get a hissing "sss", a humming "mmm" and a clipped "t" rather than "tuh".
 
@@ -126,7 +128,15 @@ npm run audio                 # only generates clips that are missing
 npm run audio -- --force      # regenerate everything
 npm run audio -- --only sounds --analyze   # regenerate the 66 sounds and print a frame-by-frame picture of each
 TTS_VOICE=en-US-Neural2-C npm run audio -- --force   # a different voice
+npm run audio:male            # the male set, into public/audio/male/
+TTS_VOICE_MALE=en-US-Neural2-D npm run audio:male -- --force   # a different male voice
 ```
+
+`TTS_VOICE` only applies to the female set and `TTS_VOICE_MALE` to the male set. The generator refuses to add clips in a different voice to an existing set unless you pass `--force`, so voices never mix. Clip URLs in the manifest carry a content version (`?v=…`), so regenerated clips reach installed apps even though clips are cached for a year. A clip that fails to generate is left out of the manifest (the app falls back for it); run the generator again to fill it in.
+
+**Without a local setup:** add `GOOGLE_TTS_API_KEY` as a repository secret, then Actions → **Generate voice clips** → Run workflow (pick the branch and the voice). It commits the new clips to that branch, including a partial set if some clips failed. Commits from the workflow don't start the APK build, so run "Android APK and web build" afterwards (or push any commit).
+
+The consonant cutting was tuned on the female voice. After generating a male set, listen to the 66 sounds (`npm run audio:male -- --only sounds --analyze --force` prints a picture of each) before shipping. Each voice set adds about 12 MB to the app.
 
 The whole curriculum is about 15,000 characters, well inside Google's free monthly tier.
 
@@ -142,7 +152,7 @@ Home → **Parents** (gated by a multiplication question).
 - **Activity**: minutes per day for the last 14 days against the daily goal, and a table of recent sessions (duration, accuracy, new items, stopped early).
 - **Sounds**: the sound map (every grapheme coloured by mastery), heart words, and "trouble spots" (sounds with a high error rate).
 - **Account**: sign in / create account / restore from cloud / sign out.
-- **Settings**: child's name, daily goal, sound effects, voice speed, record sounds, reset.
+- **Settings**: child's name, daily goal, sound effects, female or male voice, voice speed, record sounds, reset.
 
 ## Project layout
 
@@ -184,7 +194,7 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 ## Known limitations / ideas
 
-- Dynamic mascot lines (ones that include the child's name) use the device's TTS voice; everything else is bundled studio audio.
+- Dynamic mascot lines (ones that include the child's name) use the device's TTS voice; everything else is bundled studio audio. Devices don't report a voice's gender, so the device fallback goes by well-known voice names; on a device with no male English voice, Male falls back to whatever voice it has.
 - The app checks answers by tapping, so a parent sitting alongside should listen for the child saying sounds and words out loud.
 - One child profile per parent account. Multiple children could be added by nesting progress under `users/{uid}/children/{childId}`.
 - Group 13 (adjacent consonants) and groups 14–16 (magic e and alternative spellings) are included; a Phase 5 "alternative pronunciations" stage (e.g. `ow` in snow vs cow) is a natural next addition.

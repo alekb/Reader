@@ -5,6 +5,8 @@
  */
 import { Capacitor } from '@capacitor/core'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
+import type { VoiceGender } from '../engine/types'
+import { voiceGenderOf } from './voiceNames'
 
 const isNative = Capacitor.isNativePlatform()
 
@@ -20,6 +22,19 @@ export function setVoiceRate(rate: number) {
   baseRate = rate
 }
 
+export type { VoiceGender }
+let gender: VoiceGender = 'female'
+/** Which voice the parent picked. Bundled clips and the device voice both follow it. */
+export function setVoiceGender(g: VoiceGender) {
+  if (g === gender) return
+  gender = g
+  preferredVoice = pickVoice()
+  nativeVoice = null
+}
+export function getVoiceGender(): VoiceGender {
+  return gender
+}
+
 /** Optional lookup of a pre-recorded clip for an exact phrase (set by phonics.ts). */
 let phraseResolver: ((text: string) => Promise<string | null>) | null = null
 export function setPhraseResolver(fn: (text: string) => Promise<string | null>) {
@@ -30,6 +45,48 @@ let generation = 0
 let chain: Promise<void> = Promise.resolve()
 let preferredVoice: SpeechSynthesisVoice | null = null
 let voicesLoaded = false
+
+function genderScore(name: string): number {
+  const g = voiceGenderOf(name)
+  return g === gender ? 8 : g ? -8 : 0
+}
+
+/** Index of the best native (Android) voice for the chosen gender, or undefined for the system default. */
+let nativeVoice: Promise<number | undefined> | null = null
+function nativeVoiceIndex(): Promise<number | undefined> {
+  if (!nativeVoice) {
+    const p: Promise<number | undefined> = TextToSpeech.getSupportedVoices()
+      .then(({ voices }) => {
+        let best: number | undefined
+        let bestScore = 0
+        voices.forEach((v, i) => {
+          if (!/^en[-_]/i.test(v.lang)) return
+          let sc = genderScore(`${v.name} ${v.voiceURI}`)
+          if (sc <= 0) return
+          if (/en[-_]US/i.test(v.lang)) sc += 3
+          if (v.localService) sc += 1
+          if (sc > bestScore) {
+            best = i
+            bestScore = sc
+          }
+        })
+        return best
+      })
+      .catch(() => undefined)
+    nativeVoice = p
+    // The engine may still be starting (empty list or an error): ask again next time.
+    p.then((i) => {
+      if (i === undefined && nativeVoice === p) nativeVoice = null
+    })
+  }
+  return nativeVoice
+}
+
+/** The browser voice for the chosen gender. */
+function webVoice(): SpeechSynthesisVoice | null {
+  if (!voicesLoaded) preferredVoice = pickVoice()
+  return preferredVoice
+}
 
 function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof speechSynthesis === 'undefined') return null
@@ -42,7 +99,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
     if (/en[-_]US/i.test(v.lang)) s += 3
     if (/google/i.test(v.name)) s += 4
     if (/natural|neural|premium|enhanced/i.test(v.name)) s += 5
-    if (/female|samantha|karen|moira|zira|aria|jenny/i.test(v.name)) s += 1
+    s += genderScore(v.name)
     if (v.localService) s += 1
     return s
   }
@@ -63,12 +120,12 @@ function sleep(ms: number): Promise<void> {
 function speakWeb(text: string, opts: SpeakOptions, gen: number): Promise<void> {
   return new Promise((resolve) => {
     if (typeof speechSynthesis === 'undefined') return resolve()
-    if (!voicesLoaded) preferredVoice = pickVoice()
+    const voice = webVoice()
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'en-US'
     u.rate = opts.rate ?? baseRate
     u.pitch = opts.pitch ?? 1.05
-    if (preferredVoice) u.voice = preferredVoice
+    if (voice) u.voice = voice
     let done = false
     const finish = () => {
       if (done) return
@@ -87,10 +144,21 @@ function speakWeb(text: string, opts: SpeakOptions, gen: number): Promise<void> 
 async function speakNative(text: string, opts: SpeakOptions, gen: number): Promise<void> {
   if (gen !== generation) return
   try {
-    await TextToSpeech.speak({ text, lang: 'en-US', rate: opts.rate ?? baseRate, pitch: opts.pitch ?? 1.05, category: 'playback' })
+    const voice = await nativeVoiceIndex()
+    if (gen !== generation) return
+    await TextToSpeech.speak({ text, lang: 'en-US', rate: opts.rate ?? baseRate, pitch: opts.pitch ?? 1.05, voice, category: 'playback' })
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Speak with the device voice right now, not queued. For jobs already running
+ * on the chain (phonics.ts); `stopSpeaking()` still cancels it.
+ */
+export function speakNow(text: string, opts: SpeakOptions = {}): Promise<void> {
+  const gen = generation
+  return isNative ? speakNative(text, opts, gen) : speakWeb(text, opts, gen)
 }
 
 /** Speak text, queued after anything already speaking. */

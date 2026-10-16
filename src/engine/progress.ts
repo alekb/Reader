@@ -3,6 +3,15 @@ import { defaultLook, defaultPartIds, PART_BY_ID } from '../content/parts'
 import type { ActivityResult, Progress } from './types'
 import { applyAnswer, newItem } from './scheduler'
 
+export const DEFAULT_SETTINGS: Progress['settings'] = { sfx: true, voiceRate: 0.9, voice: 'female', changedAt: 0 }
+
+/** Fill in settings added after the progress was saved. */
+function withSettings(p: Progress): Progress {
+  const s = p.settings as Partial<Progress['settings']> | undefined
+  if (s && s.voice && typeof s.changedAt === 'number') return p
+  return { ...p, settings: { ...DEFAULT_SETTINGS, ...s } }
+}
+
 export function createProgress(childName: string, character: CharacterBase, now: number): Progress {
   return {
     version: 2,
@@ -24,7 +33,7 @@ export function createProgress(childName: string, character: CharacterBase, now:
     lastSessionAccuracy: 1,
     streak: { count: 0, lastDay: '' },
     dailyGoalMin: 12,
-    settings: { sfx: true, voiceRate: 0.9 },
+    settings: DEFAULT_SETTINGS,
     createdAt: now,
     updatedAt: now,
   }
@@ -86,13 +95,13 @@ export function migrateProgress(raw: unknown): Progress | null {
   if (!raw || typeof raw !== 'object') return null
   const p = raw as Record<string, unknown>
   if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) {
-    const cur = p as unknown as Progress
+    const cur = withSettings(p as unknown as Progress)
     const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds()])]
     return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
   }
   const base = (['robot', 'dragon', 'monster'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
   const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()))
-  const out: Progress = { ...fresh, ...(p as Partial<Progress>), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
+  const out: Progress = { ...withSettings({ ...fresh, ...(p as Partial<Progress>) }), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
   // Translate the old skin catalogue (v1) into parts.
   const oldSkins: string[] = Array.isArray(p.unlockedSkins) ? (p.unlockedSkins as string[]) : []
   const accessoryToPart: Record<string, string> = {

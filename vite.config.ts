@@ -36,10 +36,18 @@ export default defineConfig({
         navigateFallback: 'index.html',
         // Audio clips are fetched on demand and cached for offline use.
         runtimeCaching: [
+          // Manifests change when clips are added or regenerated, so check the network first.
+          // Same cache as the clips, so a manifest cached by an older version still works offline.
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/audio/') && url.pathname.endsWith('/manifest.json'),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'audio', networkTimeoutSeconds: 3 },
+          },
+          // Clip URLs carry a content version (?v=...), so a cached clip never goes stale.
           {
             urlPattern: ({ url }) => url.pathname.includes('/audio/'),
             handler: 'CacheFirst',
-            options: { cacheName: 'audio', expiration: { maxEntries: 3000, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+            options: { cacheName: 'audio', expiration: { maxEntries: 6000, maxAgeSeconds: 60 * 60 * 24 * 365 } },
           },
         ],
       },

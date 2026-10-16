@@ -3,7 +3,10 @@
  * Google Cloud Text-to-Speech, so the app ships studio-quality audio that works
  * offline and needs no key at runtime.
  *
- *   GOOGLE_TTS_API_KEY=... node scripts/generate-audio.mjs [--force] [--only sounds|letters|words|phrases] [--analyze]
+ *   GOOGLE_TTS_API_KEY=... node scripts/generate-audio.mjs [--voice female|male] [--force] [--only sounds|letters|words|phrases] [--analyze]
+ *
+ * The female set goes to public/audio/, the male set to public/audio/male/;
+ * parents choose between them in Parents → Settings → Voice.
  *
  * Pure consonant sounds are the hard part: the engine refuses a lone consonant
  * phoneme, so each consonant is synthesized inside a syllable ("sɑ", "tə") and
@@ -14,7 +17,7 @@
  *     appear, looped the same way,
  *   - stops (t p k d g b) keep only the burst plus a few ms, so "t" not "tuh",
  *   - vowels are synthesized directly from IPA.
- * Output: public/audio/{sounds,letters,words,phrases}/*.mp3 + manifest.json.
+ * Output: public/audio[/male]/{sounds,letters,words,phrases}/*.mp3 + manifest.json.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -31,9 +34,15 @@ const args = process.argv.slice(2)
 const FORCE = args.includes('--force')
 const ANALYZE = args.includes('--analyze')
 const ONLY = args.includes('--only') ? args[args.indexOf('--only') + 1] : null
-const VOICE = process.env.TTS_VOICE || 'en-US-Neural2-F'
+const GENDER = args.includes('--voice') ? args[args.indexOf('--voice') + 1] : 'female'
+if (GENDER !== 'female' && GENDER !== 'male') {
+  console.error('--voice must be female or male.')
+  process.exit(1)
+}
+// Each set has its own override, so a female TTS_VOICE in .env never ends up in the male folder.
+const VOICE = GENDER === 'male' ? process.env.TTS_VOICE_MALE || 'en-US-Neural2-J' : process.env.TTS_VOICE || 'en-US-Neural2-F'
 const SR = 24000
-const OUT = path.resolve('public/audio')
+const OUT = path.resolve(GENDER === 'male' ? 'public/audio/male' : 'public/audio')
 const CONCURRENCY = 6
 
 // ---------------------------------------------------------------- content
@@ -383,6 +392,10 @@ function finish(pcm, fadeIn, fadeOut) {
 const manifest = { voice: VOICE, sounds: {}, letters: {}, words: {}, phrases: {} }
 const manifestFile = path.join(OUT, 'manifest.json')
 const existing = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, 'utf8')) : null
+if (existing?.voice && existing.voice !== VOICE && !FORCE) {
+  console.error(`${path.relative('.', OUT)} was generated with ${existing.voice}, not ${VOICE}. Add --force to regenerate it all, so voices don't mix.`)
+  process.exit(1)
+}
 
 function hash(s) {
   return crypto.createHash('sha1').update(s).digest('hex').slice(0, 16)
@@ -456,15 +469,24 @@ async function worker() {
     } catch (e) {
       failed++
       console.error(`FAILED ${job.kind}/${job.key}: ${e.message}`)
+      // Leave it out of the manifest (the app then falls back) unless an older clip is still there.
+      if (!fs.existsSync(file)) delete manifest[job.kind][job.key]
     }
   }
 }
 await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+// Version each URL by content: installed apps cache clips for a year, so a regenerated clip needs a new URL.
+for (const k of ['sounds', 'letters', 'words', 'phrases']) {
+  for (const [key, f] of Object.entries(manifest[k])) {
+    const file = path.join(OUT, f.split('?')[0])
+    if (fs.existsSync(file)) manifest[k][key] = `${f.split('?')[0]}?v=${hash(fs.readFileSync(file)).slice(0, 8)}`
+  }
+}
 fs.mkdirSync(OUT, { recursive: true })
 fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 1))
 // After a full run, delete clips that the manifest no longer references (removed words, old phrases).
 if (!ONLY) {
-  const referenced = new Set(['sounds', 'letters', 'words', 'phrases'].flatMap((k) => Object.values(manifest[k])))
+  const referenced = new Set(['sounds', 'letters', 'words', 'phrases'].flatMap((k) => Object.values(manifest[k]).map((f) => f.split('?')[0])))
   let pruned = 0
   for (const dir of ['sounds', 'letters', 'words', 'phrases']) {
     const abs = path.join(OUT, dir)
