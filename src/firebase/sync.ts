@@ -1,15 +1,19 @@
 /**
  * Cloud persistence: Firestore documents under users/{uid}.
- *   users/{uid}                      -> { progress: Progress, updatedAt }
- *   users/{uid}/sessions/{sessionId} -> SessionLog
- *   users/{uid}/recordings/{key}     -> { b64, type, updatedAt }
+ *   users/{uid}                                   -> { progress, updatedAt, resetAt, removedChildren }
+ *   users/{uid}/sessions/{sessionId}              -> SessionLog          (first child)
+ *   users/{uid}/children/{childId}                -> { progress, updatedAt, resetAt }
+ *   users/{uid}/children/{childId}/sessions/{id}  -> SessionLog          (other children)
+ *   users/{uid}/recordings/{key}                  -> { b64, type, updatedAt }  (shared)
+ * The first child (LEGACY_CHILD_ID) stays at users/{uid}, where versions with
+ * one child keep it, so those versions keep working. `removedChildren` lists
+ * children removed on any device, so another device never uploads them again.
  * Local data is the source of truth while offline; on sign-in we merge.
  */
-import { collection, deleteDoc, doc, getDoc, getDocFromServer, getDocs, setDoc, writeBatch } from 'firebase/firestore'
-import type { Firestore } from 'firebase/firestore'
-import type { Progress, SessionLog } from '../engine/types'
-import type { ItemState } from '../engine/types'
-import { migrateProgress } from '../engine/progress'
+import { arrayUnion, collection, deleteDoc, deleteField, doc, getDoc, getDocFromServer, getDocs, setDoc, writeBatch } from 'firebase/firestore'
+import type { DocumentReference, Firestore } from 'firebase/firestore'
+import type { ChildRecord, ItemState, Progress, SessionLog } from '../engine/types'
+import { LEGACY_CHILD_ID, migrateProgress } from '../engine/progress'
 
 function mergeItems(a: Record<string, ItemState>, b: Record<string, ItemState>): Record<string, ItemState> {
   const out: Record<string, ItemState> = { ...a }
@@ -65,19 +69,83 @@ export function mergeSessions(local: SessionLog[], remote: SessionLog[]): Sessio
   return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt)
 }
 
-export async function fetchRemote(db: Firestore, uid: string): Promise<{ progress: Progress | null; sessions: SessionLog[]; resetAt: number }> {
-  const snap = await getDoc(doc(db, 'users', uid))
-  const data = snap.exists() ? snap.data() : {}
-  const progress = data.progress ? migrateProgress(data.progress) : null
-  const sessSnap = await getDocs(collection(db, 'users', uid, 'sessions'))
-  const sessions = sessSnap.docs.map((d) => d.data() as SessionLog)
+/** A child's cloud copy. `resetAt` marks when it was last started over on any device (0 = never). */
+export interface RemoteChild {
+  progress: Progress | null
+  sessions: SessionLog[]
+  resetAt: number
+}
+
+export interface RemoteAccount {
+  children: Record<string, RemoteChild>
+  /** Children removed on some device. */
+  removed: string[]
+}
+
+/** Combine the children on this device with the cloud copy, without losing work done on either side. */
+export function mergeAccount(local: Record<string, ChildRecord>, remote: RemoteAccount): Record<string, ChildRecord> {
+  const out: Record<string, ChildRecord> = {}
+  for (const id of new Set([...Object.keys(local), ...Object.keys(remote.children)])) {
+    if (remote.removed.includes(id)) continue
+    const l = local[id]
+    const r = remote.children[id]
+    const cloud = r?.progress ? { progress: r.progress, sessions: r.sessions } : null
+    if (!l || (r?.resetAt && l.progress.createdAt < r.resetAt)) {
+      // Only in the cloud, or started over on another device after this copy was made.
+      if (cloud) out[id] = cloud
+    } else if (!cloud) out[id] = l
+    else out[id] = { progress: mergeProgress(l.progress, cloud.progress)!, sessions: mergeSessions(l.sessions, cloud.sessions).slice(-400) }
+  }
+  return out
+}
+
+function childDoc(db: Firestore, uid: string, id: string): DocumentReference {
+  return id === LEGACY_CHILD_ID ? doc(db, 'users', uid) : doc(db, 'users', uid, 'children', id)
+}
+
+function sessionsPath(uid: string, id: string): string {
+  return id === LEGACY_CHILD_ID ? `users/${uid}/sessions` : `users/${uid}/children/${id}/sessions`
+}
+
+async function fetchSessions(db: Firestore, uid: string, id: string): Promise<SessionLog[]> {
+  const snap = await getDocs(collection(db, sessionsPath(uid, id)))
+  return snap.docs.map((d) => d.data() as SessionLog)
+}
+
+function remoteChild(data: Record<string, unknown>, id: string, sessions: SessionLog[]): RemoteChild {
+  const progress = data.progress ? migrateProgress({ ...(data.progress as object), id }) : null
   return { progress, sessions, resetAt: Number(data.resetAt ?? 0) }
 }
 
-/** When the progress was last reset from any device (0 = never). Reads the server, not the cache. */
-export async function fetchResetAt(db: Firestore, uid: string): Promise<number> {
-  const snap = await getDocFromServer(doc(db, 'users', uid))
-  return snap.exists() ? Number(snap.data().resetAt ?? 0) : 0
+export async function fetchRemote(db: Firestore, uid: string): Promise<RemoteAccount> {
+  const main = await getDoc(doc(db, 'users', uid))
+  const data = main.exists() ? main.data() : {}
+  const children: Record<string, RemoteChild> = {}
+  if (data.progress || data.resetAt) children[LEGACY_CHILD_ID] = remoteChild(data, LEGACY_CHILD_ID, data.progress ? await fetchSessions(db, uid, LEGACY_CHILD_ID) : [])
+  const kids = await getDocs(collection(db, 'users', uid, 'children'))
+  for (const k of kids.docs) {
+    const d = k.data()
+    children[k.id] = remoteChild(d, k.id, d.progress ? await fetchSessions(db, uid, k.id) : [])
+  }
+  return { children, removed: Array.isArray(data.removedChildren) ? (data.removedChildren as string[]) : [] }
+}
+
+/**
+ * Removal and reset markers for these children, read from the server (not the cache),
+ * so a push never uploads a child that was removed or started over elsewhere.
+ */
+export async function fetchMarkers(db: Firestore, uid: string, ids: string[]): Promise<{ removed: string[]; resetAt: Record<string, number> }> {
+  const main = await getDocFromServer(doc(db, 'users', uid))
+  const data = main.exists() ? main.data() : {}
+  const resetAt: Record<string, number> = {}
+  for (const id of ids) {
+    if (id === LEGACY_CHILD_ID) resetAt[id] = Number(data.resetAt ?? 0)
+    else {
+      const c = await getDocFromServer(childDoc(db, uid, id))
+      resetAt[id] = c.exists() ? Number(c.data().resetAt ?? 0) : 0
+    }
+  }
+  return { removed: Array.isArray(data.removedChildren) ? (data.removedChildren as string[]) : [], resetAt }
 }
 
 /** Throws unless the server is reachable right now (used before destructive operations). */
@@ -85,15 +153,14 @@ export async function requireServer(db: Firestore, uid: string): Promise<void> {
   await getDocFromServer(doc(db, 'users', uid))
 }
 
-export async function pushProgress(db: Firestore, uid: string, progress: Progress): Promise<void> {
-  await setDoc(doc(db, 'users', uid), { progress, updatedAt: progress.updatedAt }, { merge: true })
-}
-
-export async function pushSessions(db: Firestore, uid: string, sessions: SessionLog[]): Promise<void> {
+export async function pushChild(db: Firestore, uid: string, child: ChildRecord): Promise<void> {
+  const { progress } = child
+  await setDoc(childDoc(db, uid, progress.id), { progress, updatedAt: progress.updatedAt }, { merge: true })
   // Firestore batches are limited to 500 writes.
+  const sessions = child.sessions.slice(-50)
   for (let i = 0; i < sessions.length; i += 400) {
     const batch = writeBatch(db)
-    for (const s of sessions.slice(i, i + 400)) batch.set(doc(db, 'users', uid, 'sessions', s.id), s)
+    for (const s of sessions.slice(i, i + 400)) batch.set(doc(db, sessionsPath(uid, progress.id), s.id), s)
     await batch.commit()
   }
 }
@@ -117,9 +184,9 @@ export async function deleteRemoteRecording(db: Firestore, uid: string, key: str
   await deleteDoc(doc(db, 'users', uid, 'recordings', recordingDocId(key)))
 }
 
-/** Delete every document in users/{uid}/{name}. */
-async function deleteSubcollection(db: Firestore, uid: string, name: string): Promise<void> {
-  const snap = await getDocs(collection(db, 'users', uid, name))
+/** Delete every document in a collection. */
+async function deleteCollection(db: Firestore, path: string): Promise<void> {
+  const snap = await getDocs(collection(db, path))
   for (let i = 0; i < snap.docs.length; i += 400) {
     const batch = writeBatch(db)
     for (const d of snap.docs.slice(i, i + 400)) batch.delete(d.ref)
@@ -127,20 +194,38 @@ async function deleteSubcollection(db: Firestore, uid: string, name: string): Pr
   }
 }
 
+/** Remove a child's progress and sessions, keeping (or setting) the markers on the main document. */
+async function clearChild(db: Firestore, uid: string, id: string, resetAt: number | null): Promise<void> {
+  if (id === LEGACY_CHILD_ID) {
+    await setDoc(doc(db, 'users', uid), { progress: deleteField(), updatedAt: deleteField(), ...(resetAt ? { resetAt } : {}) }, { merge: true })
+  } else if (resetAt) await setDoc(childDoc(db, uid, id), { resetAt })
+  await deleteCollection(db, sessionsPath(uid, id))
+  if (id !== LEGACY_CHILD_ID && !resetAt) await deleteDoc(childDoc(db, uid, id))
+}
+
 /**
- * Remove the child's progress and session history from the cloud (recordings are kept).
- * A reset marker stays behind so other signed-in devices drop their older local copy
- * instead of uploading it again.
+ * Start one child over in the cloud (recordings are kept). A reset marker stays behind
+ * so other signed-in devices drop their older local copy instead of uploading it again.
  */
-export async function wipeCloudProgress(db: Firestore, uid: string, resetAt: number): Promise<void> {
-  await setDoc(doc(db, 'users', uid), { resetAt })
-  await deleteSubcollection(db, uid, 'sessions')
+export async function resetCloudChild(db: Firestore, uid: string, id: string, resetAt: number): Promise<void> {
+  await clearChild(db, uid, id, resetAt)
+}
+
+/** Remove one child from the cloud, and tell other devices it is gone. */
+export async function removeCloudChild(db: Firestore, uid: string, id: string): Promise<void> {
+  await setDoc(doc(db, 'users', uid), { removedChildren: arrayUnion(id) }, { merge: true })
+  await clearChild(db, uid, id, null)
 }
 
 /** Remove everything stored for this account. */
 export async function deleteAllCloudData(db: Firestore, uid: string): Promise<void> {
-  await deleteSubcollection(db, uid, 'recordings')
-  await deleteSubcollection(db, uid, 'sessions')
+  await deleteCollection(db, `users/${uid}/recordings`)
+  await deleteCollection(db, `users/${uid}/sessions`)
+  const kids = await getDocs(collection(db, 'users', uid, 'children'))
+  for (const k of kids.docs) {
+    await deleteCollection(db, sessionsPath(uid, k.id))
+    await deleteDoc(k.ref)
+  }
   await deleteDoc(doc(db, 'users', uid))
 }
 

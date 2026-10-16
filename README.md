@@ -59,14 +59,18 @@ With no Firebase configuration the app works fully offline and saves progress on
 
 From then on progress, session history and any sound recordings sync automatically. After a reinstall or on a new device, tap **Parents: already have an account? Sign in to restore progress** on the first screen.
 
-Account safety built in: a device never mixes two parent accounts (signing in with a different account replaces the local copy), **Sign out and remove from this device** clears local data, **Reset all progress** clears the cloud copy too, and **Delete account and all data** (Parents → Account) permanently removes the account and everything stored for it.
+Account safety built in: a device never mixes two parent accounts (signing in with a different account replaces the local copy), **Sign out and remove from this device** clears local data, **Start … over** and **Remove …** (Parents → Settings) change the cloud copy too, and **Delete account and all data** (Parents → Account) permanently removes the account and everything stored for it.
+
+**After updating to the multiple-children version, deploy the new [`firestore.rules`](firestore.rules)** (paste them in the console, or `firebase deploy --only firestore:rules`). Without them, a second child's progress cannot be saved to the cloud.
 
 Data layout in Firestore:
 
 ```
-users/{uid}                      { progress, updatedAt }
-users/{uid}/sessions/{id}        one document per session (duration, accuracy, new items...)
-users/{uid}/recordings/{key}     parent-recorded sound clips (base64)
+users/{uid}                                  { progress, updatedAt, resetAt, removedChildren }  the first child
+users/{uid}/sessions/{id}                    the first child's sessions (duration, accuracy, new items...)
+users/{uid}/children/{childId}               { progress, updatedAt, resetAt }  every other child
+users/{uid}/children/{childId}/sessions/{id} that child's sessions
+users/{uid}/recordings/{key}                 parent-recorded sound clips (base64), shared by all children
 ```
 
 ## Android app (Capacitor)
@@ -144,6 +148,17 @@ The whole curriculum is about 15,000 characters, well inside Google's free month
 
 Parents can still record any sound in their own voice: Home → **Parents** → **Settings** → **Record the sounds in your own voice**. Recordings take precedence over the bundled clips, and sync to the cloud when signed in.
 
+## Several children
+
+Each parent account can hold up to 8 children, each with their own progress, buddy, stickers, streak and settings (voice, speed, sound effects, daily goal). Parent sound recordings are shared.
+
+- **Add a child:** Parents → **+ Add a child** (next to the children's names at the top of the dashboard), then pick a buddy and a name.
+- **Who's playing?** With two or more children, the app opens on a picker where each child taps their own buddy. **👥 Switch** next to the name on the home screen brings it back.
+- **The dashboard** shows one child at a time: tap a name at the top to see that child (that child also becomes the one playing).
+- **Start over / remove** a child in Parents → Settings → Danger zone. Starting over keeps the name, buddy and settings.
+
+The child from before this feature keeps its place in the cloud (`users/{uid}`), so an older version of the app on another device still shows that child.
+
 ## Parent dashboard
 
 Home → **Parents** (gated by a multiplication question).
@@ -152,7 +167,7 @@ Home → **Parents** (gated by a multiplication question).
 - **Activity**: minutes per day for the last 14 days against the daily goal, and a table of recent sessions (duration, accuracy, new items, stopped early).
 - **Sounds**: the sound map (every grapheme coloured by mastery), heart words, and "trouble spots" (sounds with a high error rate).
 - **Account**: sign in / create account / restore from cloud / sign out.
-- **Settings**: child's name, daily goal, sound effects, female or male voice, voice speed, record sounds, reset.
+- **Settings** (for the child shown): name, daily goal, sound effects, female or male voice, voice speed, record sounds, start over, remove.
 
 ## Project layout
 
@@ -171,7 +186,8 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 ## Testing
 
 - `npm test` runs the engine tests (scheduler math, group gating, lesson building, nonsense-word safety) and content integrity tests (every sentence only uses sounds and heart words taught by its island; every word's segmentation spells the word).
-- `npm run e2e` builds, serves and drives the whole app in headless Chromium (fresh learner and a seeded learner), screenshots every activity into `e2e/shots*/` and fails on any runtime error.
+- `npm run e2e` builds, serves and drives the whole app in headless Chromium (fresh learner, seeded learner, several children), screenshots every activity into `e2e/shots*/` and fails on any runtime error.
+- Cloud sync against the Firebase emulators (needs Java): `npx firebase-tools emulators:exec --only auth,firestore --project demo-reader "npx vitest run src/firebase/sync.emulator.test.ts"`. It also checks `firestore.rules`. To try the app against the emulators, set `VITE_FIREBASE_EMULATOR_HOST=127.0.0.1` (plus placeholder `VITE_FIREBASE_*` values with project id `demo-reader`); keep that variable out of real builds.
 - CI runs build, tests and lint on every push and pull request before building the APK.
 
 ## Releasing
@@ -196,5 +212,4 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
 
 - Dynamic mascot lines (ones that include the child's name) use the device's TTS voice; everything else is bundled studio audio. Devices don't report a voice's gender, so the device fallback goes by well-known voice names; on a device with no male English voice, Male falls back to whatever voice it has.
 - The app checks answers by tapping, so a parent sitting alongside should listen for the child saying sounds and words out loud.
-- One child profile per parent account. Multiple children could be added by nesting progress under `users/{uid}/children/{childId}`.
 - Group 13 (adjacent consonants) and groups 14–16 (magic e and alternative spellings) are included; a Phase 5 "alternative pronunciations" stage (e.g. `ow` in snow vs cow) is a natural next addition.

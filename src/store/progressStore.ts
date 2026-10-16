@@ -4,11 +4,10 @@ import type { CharacterBase } from '../content/characters'
 import { PAINT_BY_ID, PART_BY_ID, levelFor } from '../content/parts'
 import type { Slot } from '../content/parts'
 import { pickSticker } from '../content/stickers'
-import type { ActivityResult, Progress, SessionLog } from '../engine/types'
+import type { ActivityResult, ChildRecord, Progress, SessionLog } from '../engine/types'
 import { applyResult, createProgress, introduce, migrateProgress, xpFor } from '../engine/progress'
 import { advanceGroups, newlyUnlockedIds } from '../engine/curriculum'
 import { bumpStreak, dayKey } from '../engine/scheduler'
-import { mergeProgress, mergeSessions } from '../firebase/sync'
 import { setSfxEnabled } from '../speech/sfx'
 import { setVoiceGender, setVoiceRate } from '../speech/tts'
 
@@ -37,15 +36,32 @@ export interface SessionSummary {
   eggAvailable: boolean
 }
 
+export type { ChildRecord }
+
+/** Most children one account can hold. */
+export const MAX_CHILDREN = 8
+
 interface ProgressState {
+  /** The child playing now (null: setting up a new child, or none yet). */
   progress: Progress | null
   sessions: SessionLog[]
+  /** Every other child on this device, by id. */
+  others: Record<string, ChildRecord>
   active: ActiveSession | null
   lastSummary: SessionSummary | null
   /** Bumped on every local change, used by the sync layer. */
   dirty: number
 
+  /** Create a child (from the welcome screen) and make it the one playing. */
   setup: (name: string, character: CharacterBase) => void
+  /** Make another child the one playing. */
+  switchChild: (id: string) => void
+  /** Put the current child aside so the welcome screen can set up a new one. */
+  addChild: () => void
+  /** Start one child over (keeps the name, buddy and settings). */
+  resetChild: (id: string) => void
+  /** Remove one child from this device. */
+  removeChild: (id: string) => void
   startSession: (group: number) => void
   recordResult: (r: ActivityResult, stepKind: string) => void
   introduceItem: (kind: 'gpc' | 'tricky', id: string) => void
@@ -60,10 +76,21 @@ interface ProgressState {
   setChildName: (name: string) => void
   setSettings: (s: Partial<Progress['settings']>) => void
   setDailyGoal: (min: number) => void
-  resetAll: () => void
-  /** Merge a cloud snapshot into local state. */
-  mergeRemote: (progress: Progress | null, sessions: SessionLog[]) => void
-  replaceAll: (progress: Progress, sessions: SessionLog[]) => void
+  /** Remove every child from this device. */
+  clearDevice: () => void
+  /** Replace every child with this set (after merging with the cloud). Keeps the same child playing when it is still there. */
+  setChildren: (children: Record<string, ChildRecord>) => void
+}
+
+/** Every child on this device, the one playing included. */
+export function allChildren(s: Pick<ProgressState, 'progress' | 'sessions' | 'others'>): Record<string, ChildRecord> {
+  return s.progress ? { ...s.others, [s.progress.id]: { progress: s.progress, sessions: s.sessions } } : { ...s.others }
+}
+
+/** Children in the order they were added. */
+export function childList(s: Pick<ProgressState, 'progress' | 'others'>): Progress[] {
+  const list = [...Object.values(s.others).map((c) => c.progress), ...(s.progress ? [s.progress] : [])]
+  return list.sort((a, b) => a.createdAt - b.createdAt)
 }
 
 function uid(): string {
@@ -75,13 +102,50 @@ export const useProgress = create<ProgressState>()(
     (set, get) => ({
       progress: null,
       sessions: [],
+      others: {},
       active: null,
       lastSummary: null,
       dirty: 0,
 
       setup: (name, character) => {
         const now = Date.now()
-        set({ progress: createProgress(name.trim() || 'Explorer', character, now), dirty: get().dirty + 1 })
+        set({ progress: createProgress(name.trim() || 'Explorer', character, now), sessions: [], active: null, lastSummary: null, dirty: get().dirty + 1 })
+      },
+
+      switchChild: (id) => {
+        const s = get()
+        const next = s.others[id]
+        if (!next) return
+        const others = { ...allChildren(s) }
+        delete others[id]
+        set({ progress: next.progress, sessions: next.sessions, others, active: null, lastSummary: null })
+      },
+
+      addChild: () => {
+        const s = get()
+        if (!s.progress || childList(s).length >= MAX_CHILDREN) return
+        set({ progress: null, sessions: [], others: allChildren(s), active: null, lastSummary: null })
+      },
+
+      resetChild: (id) => {
+        const s = get()
+        const cur = allChildren(s)[id]
+        if (!cur) return
+        const p = cur.progress
+        const fresh = { ...createProgress(p.childName, p.character, Date.now(), id), settings: p.settings, dailyGoalMin: p.dailyGoalMin }
+        if (s.progress?.id === id) set({ progress: fresh, sessions: [], active: null, lastSummary: null, dirty: s.dirty + 1 })
+        else set({ others: { ...s.others, [id]: { progress: fresh, sessions: [] } }, dirty: s.dirty + 1 })
+      },
+
+      removeChild: (id) => {
+        const s = get()
+        const others = { ...s.others }
+        delete others[id]
+        if (s.progress?.id !== id) return set({ others, dirty: s.dirty + 1 })
+        // The child playing was removed: hand over to the next one, or back to the welcome screen.
+        const next = childList({ progress: null, others })[0]
+        if (next) delete others[next.id]
+        set({ progress: next ?? null, sessions: next ? s.others[next.id].sessions : [], others, active: null, lastSummary: null, dirty: s.dirty + 1 })
       },
 
       startSession: (group) => {
@@ -224,18 +288,30 @@ export const useProgress = create<ProgressState>()(
         set({ progress: { ...p, dailyGoalMin: Math.max(5, Math.min(30, min)), updatedAt: Date.now() }, dirty: get().dirty + 1 })
       },
 
-      resetAll: () => set({ progress: null, sessions: [], active: null, lastSummary: null, dirty: get().dirty + 1 }),
+      clearDevice: () => set({ progress: null, sessions: [], others: {}, active: null, lastSummary: null, dirty: get().dirty + 1 }),
 
-      mergeRemote: (progress, sessions) => {
-        const merged = mergeProgress(get().progress, progress)
-        set({ progress: merged, sessions: mergeSessions(get().sessions, sessions).slice(-400) })
+      setChildren: (children) => {
+        const s = get()
+        const others = { ...children }
+        // A parent in the middle of adding a child stays on the welcome screen.
+        const adding = !s.progress && Object.keys(s.others).length > 0
+        // Keep the same child playing; otherwise the oldest one (the picker lets them change).
+        const keepId = adding ? undefined : s.progress && others[s.progress.id] ? s.progress.id : childList({ progress: null, others })[0]?.id
+        const active = keepId ? others[keepId] : null
+        if (keepId) delete others[keepId]
+        const same = active && s.progress?.id === active.progress.id
+        set({
+          progress: active?.progress ?? null,
+          sessions: active?.sessions.slice(-400) ?? [],
+          others,
+          active: same ? s.active : null,
+          lastSummary: same ? s.lastSummary : null,
+        })
       },
-
-      replaceAll: (progress, sessions) => set({ progress: migrateProgress(progress), sessions: sessions.slice(-400), dirty: get().dirty + 1 }),
     }),
     {
       name: 'reader-quest-progress',
-      version: 3,
+      version: 4,
       // Never let a full or blocked localStorage crash the app.
       storage: createJSONStorage(() => ({
         getItem: (k: string) => {
@@ -260,18 +336,22 @@ export const useProgress = create<ProgressState>()(
           }
         },
       })),
-      partialize: (s) => ({ progress: s.progress, sessions: s.sessions, lastSummary: s.lastSummary }),
+      partialize: (s) => ({ progress: s.progress, sessions: s.sessions, others: s.others, lastSummary: s.lastSummary }),
       migrate: (persisted) => {
-        const st = persisted as { progress?: unknown; sessions?: SessionLog[]; lastSummary?: SessionSummary | null }
-        return { ...st, progress: migrateProgress(st.progress), lastSummary: null } as unknown as ProgressState
+        const st = persisted as { progress?: unknown; sessions?: SessionLog[]; others?: Record<string, ChildRecord>; lastSummary?: SessionSummary | null }
+        return { ...st, progress: migrateProgress(st.progress), others: st.others ?? {}, lastSummary: null } as unknown as ProgressState
       },
       onRehydrateStorage: () => (state) => {
-        if (state?.progress) {
-          // Always run the migration: it is cheap and back-fills new default unlocks.
-          const migrated = migrateProgress(state.progress)
-          if (migrated && migrated !== state.progress) useProgress.setState({ progress: migrated })
-          applyAudioSettings(state.progress)
+        if (!state) return
+        // Always run the migration: it is cheap and back-fills new default unlocks and fields.
+        const progress = state.progress ? migrateProgress(state.progress) : null
+        const others: Record<string, ChildRecord> = {}
+        for (const c of Object.values(state.others ?? {})) {
+          const p = migrateProgress(c.progress)
+          if (p) others[p.id] = { progress: p, sessions: c.sessions ?? [] }
         }
+        useProgress.setState({ progress, others })
+        if (progress) applyAudioSettings(progress)
       },
     },
   ),

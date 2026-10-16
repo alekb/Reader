@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Character } from '../components/Character'
 import { Screen } from '../components/ui'
 import { CHARACTERS } from '../content/characters'
@@ -9,12 +9,17 @@ import { sfx } from '../speech/sfx'
 import { say } from '../speech/phonics'
 import { warmUp } from '../speech/tts'
 import { firebaseEnabled } from '../firebase/config'
+import { markPicked, needsPick } from './WhoIsPlaying'
 
 export function Onboarding() {
   const nav = useNavigate()
   const setup = useProgress((s) => s.setup)
+  /** Other children on this device: a parent is adding one more. */
+  const otherCount = useProgress((s) => Object.keys(s.others).length)
   const [name, setName] = useState('')
   const [base, setBase] = useState<CharacterBase | null>(null)
+  // The app was closed while adding a child: let the children pick first.
+  if (needsPick(otherCount)) return <Navigate to="/who" replace />
 
   return (
     <Screen className="items-center gap-5 px-5 pb-10 pt-10">
@@ -52,6 +57,7 @@ export function Onboarding() {
         onClick={() => {
           if (!base) return
           setup(name, base)
+          markPicked()
           sfx.fanfare()
           nav('/', { replace: true })
         }}
@@ -59,7 +65,12 @@ export function Onboarding() {
       >
         Start the adventure ➜
       </button>
-      {firebaseEnabled && (
+      {otherCount > 0 && (
+        <button onClick={() => nav('/who')} className="text-center text-sm font-bold text-grape underline">
+          Back to the other children
+        </button>
+      )}
+      {firebaseEnabled && otherCount === 0 && (
         <button onClick={() => nav('/parent')} className="text-center text-sm font-bold text-grape underline">
           Parents: already have an account? Sign in to restore progress
         </button>

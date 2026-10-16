@@ -8,10 +8,13 @@ import { newItemPolicy, nextGpcToIntroduce, nextTrickyToIntroduce, summarize } f
 import { DAY_MS, dayKey, masteryOf } from '../engine/scheduler'
 import type { MasteryLevel } from '../engine/scheduler'
 import type { SessionLog, VoiceGender } from '../engine/types'
-import { useProgress } from '../store/progressStore'
+import { Character } from '../components/Character'
+import { levelFor } from '../content/parts'
+import { MAX_CHILDREN, childList, useProgress } from '../store/progressStore'
 import { useSync } from '../store/syncStore'
 import { openDownload, useUpdate } from '../store/updateStore'
 import { isParentUnlocked } from './ParentGate'
+import { markPicked } from './WhoIsPlaying'
 import { say } from '../speech/phonics'
 import { stopSpeaking } from '../speech/tts'
 
@@ -52,6 +55,7 @@ export function Dashboard() {
     <Screen className="gap-3 px-4 pb-10 text-base">
       <TopBar title="Parent dashboard" onBack={() => nav('/')} />
       <UpdateBanner />
+      <ChildBar />
       <div className="flex gap-1 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} className={`flex-1 whitespace-nowrap rounded-xl px-2 py-2 text-xs font-extrabold ${tab === t.id ? 'bg-grape text-white' : 'text-ink/60'}`}>
@@ -63,8 +67,51 @@ export function Dashboard() {
       {tab === 'activity' && <ActivityTab sessions={sessions} goalMin={progress.dailyGoalMin} />}
       {tab === 'sounds' && <SoundsTab />}
       {tab === 'account' && <AccountTab />}
-      {tab === 'settings' && <SettingsTab />}
+      {tab === 'settings' && <SettingsTab key={progress.id} />}
     </Screen>
+  )
+}
+
+/** Which child the dashboard shows (and who plays next), plus adding a child. */
+function ChildBar() {
+  const nav = useNavigate()
+  const progress = useProgress((s) => s.progress)!
+  const others = useProgress((s) => s.others)
+  const switchChild = useProgress((s) => s.switchChild)
+  const addChild = useProgress((s) => s.addChild)
+  const children = childList({ progress, others })
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Children">
+      {children.map((c) => {
+        const on = c.id === progress.id
+        return (
+          <button
+            key={c.id}
+            role="tab"
+            aria-selected={on}
+            onClick={() => {
+              markPicked()
+              switchChild(c.id)
+            }}
+            className={`flex shrink-0 items-center gap-1 rounded-2xl px-3 py-1 font-extrabold shadow-sm ${on ? 'bg-sun ring-4 ring-grape' : 'bg-white text-ink/70'}`}
+          >
+            <Character base={c.character} look={c.look} level={levelFor(c.xp)} size={34} />
+            {c.childName}
+          </button>
+        )
+      })}
+      {children.length < MAX_CHILDREN && (
+        <button
+          onClick={() => {
+            addChild()
+            nav('/', { replace: true })
+          }}
+          className="shrink-0 rounded-2xl border-2 border-dashed border-grape/40 px-3 py-1 font-extrabold text-grape"
+        >
+          + Add a child
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -377,7 +424,6 @@ function SoundsTab() {
 
 function AccountTab() {
   const sync = useSync()
-  const progress = useProgress((s) => s.progress)
   const nav = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -420,7 +466,7 @@ function AccountTab() {
             <div className="text-sm text-ink/70">
               Status: {sync.status === 'syncing' ? 'syncing…' : sync.status === 'synced' ? `synced ${sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : ''}` : sync.status === 'error' ? `error: ${sync.error}` : sync.status}
             </div>
-            <div className="text-xs text-ink/60">Progress{progress ? ` for ${progress.childName}` : ''} is saved automatically. Reinstall the app, sign in, and everything comes back.</div>
+            <div className="text-xs text-ink/60">Every child's progress is saved automatically. Reinstall the app, sign in, and everything comes back.</div>
             <div className="flex gap-2">
               <button onClick={() => sync.pull()} className="btn btn-secondary flex-1 text-base" disabled={sync.status === 'syncing'}>
                 ⟳ Restore from cloud
@@ -533,18 +579,55 @@ function DeleteAccount() {
   )
 }
 
+/** A destructive button that asks first, and reports a failure (e.g. offline). */
+function Confirm({ label, busyLabel, warning, action }: { label: string; busyLabel: string; warning: (cloud: string) => string; action: (sync: ReturnType<typeof useSync.getState>) => Promise<void> }) {
+  const nav = useNavigate()
+  const signedIn = useSync((s) => Boolean(s.user))
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (!asking)
+    return (
+      <button onClick={() => setAsking(true)} className="btn btn-warn w-full text-base">
+        {label}
+      </button>
+    )
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="font-bold text-rose-700">{warning(signedIn ? ' on this device and in the cloud backup' : ' on this device')}</div>
+      {error && <div className="text-sm font-bold text-rose-700">{error}</div>}
+      <div className="flex gap-2">
+        <button onClick={() => setAsking(false)} className="btn btn-secondary flex-1 text-base">
+          Cancel
+        </button>
+        <button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setError(null)
+            try {
+              await action(useSync.getState())
+              nav('/', { replace: true })
+            } catch (e) {
+              setError((e as Error).message)
+              setBusy(false)
+            }
+          }}
+          className="btn btn-warn flex-1 text-base"
+        >
+          {busy ? busyLabel : `Yes, ${label.charAt(0).toLowerCase()}${label.slice(1)}`}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SettingsTab() {
   const progress = useProgress((s) => s.progress)!
   const setChildName = useProgress((s) => s.setChildName)
   const setDailyGoal = useProgress((s) => s.setDailyGoal)
   const setSettings = useProgress((s) => s.setSettings)
-  const resetProgress = useSync((s) => s.resetProgress)
-  const signedIn = useSync((s) => Boolean(s.user))
-  const nav = useNavigate()
   const [name, setName] = useState(progress.childName)
-  const [confirmReset, setConfirmReset] = useState(false)
-  const [resetting, setResetting] = useState(false)
-  const [resetError, setResetError] = useState<string | null>(null)
   const [showRecorder, setShowRecorder] = useState(false)
   const chooseVoice = (voice: VoiceGender) => {
     setSettings({ voice })
@@ -608,40 +691,19 @@ function SettingsTab() {
       </Card>
       <AppCard />
       <Card title="Danger zone">
-        {!confirmReset ? (
-          <button onClick={() => setConfirmReset(true)} className="btn btn-warn w-full text-base">
-            Reset all progress
-          </button>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <div className="font-bold text-rose-700">
-              This erases {progress.childName}'s progress and session history{signedIn ? ' on this device and in the cloud backup' : ' on this device'}. Voice recordings are kept.
-            </div>
-            {resetError && <div className="text-sm font-bold text-rose-700">{resetError}</div>}
-            <div className="flex gap-2">
-              <button onClick={() => setConfirmReset(false)} className="btn btn-secondary flex-1 text-base">
-                Cancel
-              </button>
-              <button
-                disabled={resetting}
-                onClick={async () => {
-                  setResetting(true)
-                  setResetError(null)
-                  try {
-                    await resetProgress()
-                    nav('/', { replace: true })
-                  } catch (e) {
-                    setResetError((e as Error).message)
-                    setResetting(false)
-                  }
-                }}
-                className="btn btn-warn flex-1 text-base"
-              >
-                {resetting ? 'Resetting…' : 'Yes, reset'}
-              </button>
-            </div>
-          </div>
-        )}
+        <Confirm
+          label={`Start ${progress.childName} over`}
+          busyLabel="Resetting…"
+          warning={(cloud) => `This erases ${progress.childName}'s progress and session history${cloud}. ${progress.childName}'s name, buddy and settings stay, and voice recordings are kept.`}
+          action={(sync) => sync.resetChild(progress.id)}
+        />
+        <div className="h-2" />
+        <Confirm
+          label={`Remove ${progress.childName}`}
+          busyLabel="Removing…"
+          warning={(cloud) => `This removes ${progress.childName} and all of ${progress.childName}'s progress and session history${cloud}. Voice recordings are kept.`}
+          action={(sync) => sync.removeChild(progress.id)}
+        />
       </Card>
     </>
   )

@@ -3,9 +3,10 @@
  */
 import { create } from 'zustand'
 import { EmailAuthProvider, createUserWithEmailAndPassword, deleteUser, onAuthStateChanged, reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut as fbSignOut } from 'firebase/auth'
+import type { Firestore } from 'firebase/firestore'
 import { firebaseEnabled, getFirebase } from '../firebase/config'
-import { deleteAllCloudData, deleteRemoteRecording, fetchRecordings, fetchRemote, fetchResetAt, pushProgress, pushRecording, pushSessions, requireServer, wipeCloudProgress } from '../firebase/sync'
-import { useProgress } from './progressStore'
+import { deleteAllCloudData, deleteRemoteRecording, fetchMarkers, fetchRecordings, fetchRemote, mergeAccount, pushChild, pushRecording, removeCloudChild, requireServer, resetCloudChild } from '../firebase/sync'
+import { allChildren, useProgress } from './progressStore'
 import { base64ToBlob, blobToBase64, clearRecordings, hasRecording, saveRecording } from '../speech/recordings'
 
 export type SyncStatus = 'disabled' | 'signedOut' | 'syncing' | 'synced' | 'error'
@@ -18,7 +19,7 @@ interface SyncState {
   error: string | null
   signUp: (email: string, password: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
-  /** Sign out. With clearDevice, the child's progress and recordings are removed from this device too. */
+  /** Sign out. With clearDevice, the children's progress and recordings are removed from this device too. */
   signOut: (opts?: { clearDevice?: boolean }) => Promise<void>
   resetPassword: (email: string) => Promise<void>
   /** Pull cloud data and merge it into local state. */
@@ -29,8 +30,10 @@ interface SyncState {
   uploadRecording: (key: string, blob: Blob) => Promise<void>
   /** Remove a recording from the cloud (local copy is removed by the caller). */
   deleteRecording: (key: string) => Promise<void>
-  /** Erase the child's progress here and in the cloud (needs internet when signed in). */
-  resetProgress: () => Promise<void>
+  /** Start one child over, here and in the cloud (needs internet when signed in). */
+  resetChild: (id: string) => Promise<void>
+  /** Remove one child, here and in the cloud (needs internet when signed in). */
+  removeChild: (id: string) => Promise<void>
   /** Permanently delete the parent account and every piece of cloud and local data. */
   deleteAccount: (password: string) => Promise<void>
 }
@@ -82,10 +85,26 @@ function friendly(e: unknown): string {
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 let lastPushedDirty = -1
+/** progress.updatedAt of each child as last uploaded, so unchanged children are skipped. */
+let pushedAt: Record<string, number> = {}
 /** The push currently talking to Firestore, so destructive operations can wait for it. */
 let pushInFlight: Promise<void> | null = null
 /** True while a reset or account deletion runs: no pushes may start. */
 let wiping = false
+
+/**
+ * Run a destructive cloud change before the matching local one. Checks the server is
+ * reachable first, so nothing is half-done; stops pushes until the caller clears `wiping`.
+ * Does nothing when signed out.
+ */
+async function cloudFirst(user: { uid: string } | null, change: (db: Firestore, uid: string) => Promise<void>) {
+  const fb = getFirebase()
+  if (!fb || !user) return
+  await withTimeout(requireServer(fb.db, user.uid), 8000, OFFLINE)
+  await quiesce()
+  // If the connection drops now, the writes stay queued and finish once online.
+  await withTimeout(change(fb.db, user.uid), 20000, OFFLINE).catch(() => {})
+}
 
 /** Stop scheduled pushes and wait for one already running. */
 async function quiesce() {
@@ -127,7 +146,7 @@ export const useSync = create<SyncState>()((set, get) => ({
     await withTimeout(get().push(), 4000, OFFLINE).catch(() => {})
     await fbSignOut(fb.auth)
     if (opts?.clearDevice) {
-      useProgress.getState().resetAll()
+      useProgress.getState().clearDevice()
       await clearRecordings()
       writeOwner('')
     }
@@ -149,21 +168,19 @@ export const useSync = create<SyncState>()((set, get) => ({
     if (!fb || !user) return
     set({ status: 'syncing', error: null })
     try {
-      const { progress, sessions, resetAt } = await fetchRemote(fb.db, user.uid)
+      const remote = await fetchRemote(fb.db, user.uid)
       const owner = readOwner()
-      const local = useProgress.getState().progress
-      if (resetAt && local && local.createdAt < resetAt) {
-        // Progress was reset on another device after this copy was made: drop it.
-        if (progress) useProgress.getState().replaceAll(progress, sessions)
-        else useProgress.getState().resetAll()
-      } else if (owner && owner !== user.uid && progress) {
-        // This device held another parent's child and this account has its own: never mix, take the cloud copy.
+      const cloudHasChildren = Object.values(remote.children).some((c) => c.progress)
+      let children
+      if (owner && owner !== user.uid && cloudHasChildren) {
+        // This device held another parent's children and this account has its own: never mix, take the cloud copy.
         await clearRecordings()
-        useProgress.getState().replaceAll(progress, sessions)
+        children = mergeAccount({}, remote)
       } else {
-        // Same account, or an account with nothing saved yet: combine (the local child moves into this account).
-        useProgress.getState().mergeRemote(progress, sessions)
+        // Same account, or an account with nothing saved yet: combine (the children here move into this account).
+        children = mergeAccount(allChildren(useProgress.getState()), remote)
       }
+      useProgress.getState().setChildren(children)
       writeOwner(user.uid)
       // Restore recordings that are missing locally.
       const recs = await fetchRecordings(fb.db, user.uid).catch(() => [])
@@ -172,6 +189,7 @@ export const useSync = create<SyncState>()((set, get) => ({
       }
       set({ status: 'synced', lastSyncAt: Date.now() })
       // Push the merged result back so both sides agree.
+      pushedAt = {}
       await get().push()
     } catch (e) {
       set({ status: 'error', error: friendly(e) })
@@ -182,23 +200,29 @@ export const useSync = create<SyncState>()((set, get) => ({
     const fb = getFirebase()
     const user = get().user
     if (!fb || !user || wiping) return
+    let stale = false
     const run = async () => {
-      const { progress, sessions, dirty } = useProgress.getState()
-      if (!progress) return
+      const state = useProgress.getState()
+      const children = allChildren(state)
+      // The child playing (its answers do not always bump updatedAt), plus any other child that changed.
+      const ids = Object.keys(children).filter((id) => id === state.progress?.id || pushedAt[id] !== children[id].progress.updatedAt)
+      if (!ids.length) return
       set({ status: 'syncing', error: null })
       try {
-        // Never upload a copy older than a reset made on another device.
-        const resetAt = await fetchResetAt(fb.db, user.uid).catch(() => 0)
-        if (resetAt && progress.createdAt < resetAt) {
-          useProgress.getState().resetAll()
-          set({ status: 'synced', lastSyncAt: Date.now() })
-          return
+        // Never upload a child that was removed, or started over, on another device after this copy was made.
+        const markers = await fetchMarkers(fb.db, user.uid, ids).catch(() => null)
+        const gone = ids.filter((id) => markers && (markers.removed.includes(id) || children[id].progress.createdAt < (markers.resetAt[id] ?? 0)))
+        if (gone.length) {
+          for (const id of gone) useProgress.getState().removeChild(id)
+          stale = true
         }
-        if (wiping) return
-        await pushProgress(fb.db, user.uid, progress)
-        if (wiping) return
-        await pushSessions(fb.db, user.uid, sessions.slice(-50))
-        lastPushedDirty = dirty
+        for (const id of ids) {
+          if (wiping) return
+          if (gone.includes(id)) continue
+          await pushChild(fb.db, user.uid, children[id])
+          pushedAt[id] = children[id].progress.updatedAt
+        }
+        lastPushedDirty = state.dirty
         set({ status: 'synced', lastSyncAt: Date.now() })
       } catch (e) {
         set({ status: 'error', error: friendly(e) })
@@ -211,6 +235,8 @@ export const useSync = create<SyncState>()((set, get) => ({
     } finally {
       if (pushInFlight === p) pushInFlight = null
     }
+    // A child was started over elsewhere: fetch its new copy.
+    if (stale) await get().pull()
   },
 
   uploadRecording: async (key, blob) => {
@@ -228,23 +254,17 @@ export const useSync = create<SyncState>()((set, get) => ({
     await deleteRemoteRecording(fb.db, user.uid, key).catch(() => {})
   },
 
-  resetProgress: async () => {
-    const fb = getFirebase()
-    const user = get().user
-    if (!fb || !user) {
-      useProgress.getState().resetAll()
-      return
-    }
-    // Check we are online before touching anything, so nothing is half-done.
-    await withTimeout(requireServer(fb.db, user.uid), 8000, OFFLINE)
-    await quiesce()
-    try {
-      // If the connection drops now, the deletes stay queued and finish once online.
-      await withTimeout(wipeCloudProgress(fb.db, user.uid, Date.now()), 20000, OFFLINE).catch(() => {})
-      useProgress.getState().resetAll()
-    } finally {
-      wiping = false
-    }
+  resetChild: async (id) => {
+    await cloudFirst(get().user, (db, uid) => resetCloudChild(db, uid, id, Date.now()))
+    useProgress.getState().resetChild(id)
+    wiping = false
+  },
+
+  removeChild: async (id) => {
+    await cloudFirst(get().user, (db, uid) => removeCloudChild(db, uid, id))
+    useProgress.getState().removeChild(id)
+    delete pushedAt[id]
+    wiping = false
   },
 
   deleteAccount: async (password) => {
@@ -263,7 +283,7 @@ export const useSync = create<SyncState>()((set, get) => ({
       throw new Error(friendly(e))
     }
     wiping = false
-    useProgress.getState().resetAll()
+    useProgress.getState().clearDevice()
     await clearRecordings()
     writeOwner('')
     set({ user: null, status: 'signedOut', lastSyncAt: null })

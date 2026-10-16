@@ -7,6 +7,7 @@ import { LEVEL_NAMES, levelProgress, unlockedTricks } from '../content/parts'
 import { soundsKnown, summarize } from '../engine/curriculum'
 import { dayKey } from '../engine/scheduler'
 import { useProgress } from '../store/progressStore'
+import { needsPick } from './WhoIsPlaying'
 import { useUpdate } from '../store/updateStore'
 import { say } from '../speech/phonics'
 import { sfx } from '../speech/sfx'
@@ -16,6 +17,7 @@ export function Home() {
   const nav = useNavigate()
   const progress = useProgress((s) => s.progress)!
   const sessions = useProgress((s) => s.sessions)
+  const otherCount = useProgress((s) => Object.keys(s.others).length)
   const updateReady = useUpdate((s) => s.status === 'available')
   const [mood, setMood] = useState<'idle' | 'happy' | 'talking'>('idle')
   const [trickClass, setTrickClass] = useState('')
@@ -33,6 +35,10 @@ export function Home() {
   const eggReady = progress.lastEggDay !== dayKey(now)
 
   useEffect(() => () => stopSpeaking(), [])
+  // More than one child: ask who is playing when the app starts.
+  useEffect(() => {
+    if (needsPick(otherCount + 1)) nav('/who', { replace: true })
+  }, [otherCount, nav])
 
   /** Tapping the buddy: it does one of its unlocked tricks. */
   const doTrick = () => {
@@ -57,7 +63,14 @@ export function Home() {
             <div className="text-sm font-bold uppercase text-ink/50">
               {island.theme.emoji} {island.title}
             </div>
-            <div className="text-3xl font-extrabold text-grape">{progress.childName}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-3xl font-extrabold text-grape">{progress.childName}</div>
+              {otherCount > 0 && (
+                <button onClick={() => nav('/who')} aria-label="Switch player" className="rounded-full bg-white px-2 py-1 text-sm font-extrabold text-grape shadow">
+                  👥 Switch
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="rounded-full bg-white px-3 py-1 text-lg font-extrabold text-orange-600 shadow">🔥 {summary.streak}</div>
