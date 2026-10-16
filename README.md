@@ -50,11 +50,15 @@ With no Firebase configuration the app works fully offline and saves progress on
 
 ## Cloud sync and parent account (Firebase)
 
+Cloud backup is on: the app uses the Firebase project `reader-quest-d130f`, whose web config is in [`src/firebase/config.ts`](src/firebase/config.ts). That config is public by design and ships in every build. [`firestore.rules`](firestore.rules) keeps each parent's data private: an account can only read and write its own documents, with size limits on recordings.
+
+**To use a different Firebase project:**
+
 1. Create a free project at <https://console.firebase.google.com>.
-2. **Authentication → Sign-in method → Email/Password → Enable.**
-3. **Firestore Database → Create database** (production mode). Then open **Rules** and paste the contents of [`firestore.rules`](firestore.rules), or run `firebase deploy --only firestore:rules`. Each parent account can only read and write its own documents, with size limits on recordings.
+2. **Authentication → Sign-in method → Email/Password → Enable.** Add your web host (for example `alekb.github.io`) under **Authentication → Settings → Authorized domains**.
+3. **Firestore Database → Create database** (production mode). Then open **Rules** and paste the contents of [`firestore.rules`](firestore.rules), or run `firebase deploy --only firestore:rules`.
 4. **Project settings → General → Your apps → Add app → Web.** Copy the config values.
-5. Copy `.env.example` to `.env` and fill in the `VITE_FIREBASE_*` values. Rebuild.
+5. Either replace `PROJECT` in `src/firebase/config.ts`, or set the `VITE_FIREBASE_*` values in `.env` (local builds) or as repository secrets (CI); these override the built-in project.
 6. In the app: Home → **Parents** → solve the multiplication → **Account** → create the parent account.
 
 From then on progress, session history and any sound recordings sync automatically. After a reinstall or on a new device, tap **Parents: already have an account? Sign in to restore progress** on the first screen.
@@ -75,7 +79,7 @@ users/{uid}/recordings/{key}     parent-recorded sound clips (base64)
 
 **Updates keep progress.** Once the signing secrets below (Releasing, step 2) are set, every `main` build is a release APK signed with that one permanent key, published together with a `version.json`. The installed app checks it when opened (at most every 6 hours, and on demand from Parents → Settings → App). When a newer build exists, a red dot appears on the Parents tile, and the dashboard offers **Download update**. The phone's browser downloads the APK and Android installs it over the old one. Progress, stickers and looks are kept because the package name and signature stay the same. Android always asks you to confirm the install; there are no silent updates. A copy installed before the key was set up (a debug build) must be uninstalled once, then the signed build installed. Without the secrets, `latest-apk` falls back to a debug build that can't update an existing install. The web version and Play Store bundles don't include the update check: the web app updates itself, and Play handles updates for its builds.
 
-**No SDK needed:** every push runs the "Android APK" GitHub Actions workflow, which builds a debug APK on GitHub's runners. Open the repo's **Actions** tab → latest run → **Artifacts** → `reader-quest-debug-apk`, copy `app-debug.apk` to the phone and install it (allow "install unknown apps"). To bake cloud sync into that APK, add the `VITE_FIREBASE_*` values as repository secrets (Settings → Secrets and variables → Actions).
+**No SDK needed:** every push runs the "Android APK" GitHub Actions workflow, which builds a debug APK on GitHub's runners. Open the repo's **Actions** tab → latest run → **Artifacts** → `reader-quest-debug-apk`, copy `app-debug.apk` to the phone and install it (allow "install unknown apps"). Cloud sync is built in.
 
 To build locally instead, the Android project is in `android/` and you need Android Studio (or the Android SDK + JDK 17+):
 
@@ -177,7 +181,7 @@ docs/RESEARCH.md  the evidence review and the spec the engine implements
    base64 -w0 upload.jks   # paste into ANDROID_KEYSTORE_BASE64
    ```
    Then run the workflow manually or push a tag such as `v1.0.0`; download `reader-quest-release-aab` from the run.
-3. **Add the six `VITE_FIREBASE_*` secrets** so release builds include cloud backup. In Google Cloud, restrict the Firebase API key to your app, and consider enabling App Check.
+3. **Cloud backup is configured** (Firebase project `reader-quest-d130f`). Optionally, in Google Cloud, restrict the Firebase API key to the Firebase APIs, and consider enabling App Check.
 4. **Finish and host the privacy policy and deletion page.** Fill in the placeholders in `docs/PRIVACY.md` and `public/delete-account.html`; host the policy (for example with the web app) and give both URLs to Play Console.
 5. **Play Console:** target audience (ages 6–8 and 9–12), Families policy declarations, Data safety form (name, app activity, email, audio recordings; no sharing; encrypted in transit; deletion available), content rating questionnaire, store listing (icon from `public/icons/store-icon-512.png`, feature graphic, phone screenshots from `npm run e2e`).
 6. **Test on a real phone** from the internal testing track: microphone recording, back button, sign-in and restore after reinstall, account deletion.
