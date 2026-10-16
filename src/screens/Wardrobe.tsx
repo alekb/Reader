@@ -49,7 +49,7 @@ export function Wardrobe() {
         <div className="text-xs font-bold text-ink/50">{lp.next ? `${lp.next - progress.xp} ⭐ to level ${lp.level + 1}` : 'Max level!'}</div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {CHARACTERS.map((c) => (
           <button key={c.base} onClick={() => pick(c.base)} className={`tile flex-col py-2 text-base font-extrabold leading-tight ${progress.character === c.base ? 'bg-sun ring-4 ring-grape' : ''}`}>
             {c.emoji} {c.name}

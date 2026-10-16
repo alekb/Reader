@@ -107,7 +107,7 @@ export function migrateProgress(raw: unknown): Progress | null {
     const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds()])]
     return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
   }
-  const base = (['robot', 'dragon', 'monster', 'monkey'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
+  const base = (['robot', 'dragon', 'monster', 'monkey', 'croc'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
   const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()), LEGACY_CHILD_ID)
   const out: Progress = { ...backfill({ ...fresh, ...(p as Partial<Progress>) }), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
   // Translate the old skin catalogue (v1) into parts.
@@ -122,7 +122,7 @@ export function migrateProgress(raw: unknown): Progress | null {
     if (PART_BY_ID[id] && !out.unlockedParts.includes(id)) out.unlockedParts.push(id)
   }
   for (const sk of oldSkins) {
-    const m = /^(robot|dragon|monster|monkey)-(.+)$/.exec(sk)
+    const m = /^(robot|dragon|monster|monkey|croc)-(.+)$/.exec(sk)
     if (!m) continue
     const [, b, key] = m
     if (tierColor[key]) add(`color-${b}-${tierColor[key]}`)

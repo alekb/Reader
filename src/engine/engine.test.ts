@@ -66,7 +66,7 @@ describe('content integrity', () => {
     }
   })
   it('every character has a default colour part and part ids are unique', () => {
-    for (const base of ['robot', 'dragon', 'monster', 'monkey'] as const) {
+    for (const base of ['robot', 'dragon', 'monster', 'monkey', 'croc'] as const) {
       expect(PARTS.filter((p) => p.slot === 'color' && p.base === base && p.unlock.type === 'default').length).toBe(1)
       expect(PARTS.find((p) => p.id === defaultLook(base).color)).toBeDefined()
     }

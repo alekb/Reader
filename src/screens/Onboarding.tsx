@@ -25,7 +25,7 @@ export function Onboarding() {
     <Screen className="items-center gap-5 px-5 pb-10 pt-10">
       <div className="text-5xl font-extrabold text-grape">Reader Quest</div>
       <div className="text-center text-lg font-bold text-ink/60">Pick your buddy and let's go!</div>
-      <div className="grid w-full grid-cols-2 gap-3">
+      <div className="grid w-full grid-cols-3 gap-3">
         {CHARACTERS.map((c) => (
           <button
             key={c.base}
