@@ -25,7 +25,7 @@ export interface Part {
   id: string
   slot: Slot
   name: string
-  /** Colour parts belong to one character; everything else fits all three. */
+  /** Colour parts belong to one character; everything else fits all four. */
   base?: CharacterBase
   /** For colour parts. */
   body?: string
@@ -47,19 +47,19 @@ const colorPart = (base: CharacterBase, id: string, name: string, body: string, 
 })
 const part = (slot: Slot, id: string, name: string, icon: string, unlock: Unlock): Part => ({ id: `${slot}-${id}`, slot, name, icon, unlock })
 
-const NAMES: Record<CharacterBase, string> = { robot: 'Bolt', dragon: 'Ember', monster: 'Fuzz' }
-const BASES: CharacterBase[] = ['robot', 'dragon', 'monster']
+const NAMES: Record<CharacterBase, string> = { robot: 'Bolt', dragon: 'Ember', monster: 'Fuzz', monkey: 'Bongo' }
+const BASES: CharacterBase[] = ['robot', 'dragon', 'monster', 'monkey']
 
 const COLOR_TIERS: { id: string; name: string; unlock: Unlock; colors: Record<CharacterBase, [string, string]> }[] = [
-  { id: 'classic', name: 'Classic', unlock: { type: 'default' }, colors: { robot: ['#60a5fa', '#dbeafe'], dragon: ['#22c55e', '#bbf7d0'], monster: ['#a855f7', '#f3e8ff'] } },
-  { id: 'lime', name: 'Lime', unlock: { type: 'xp', xp: 40 }, colors: { robot: ['#a3e635', '#ecfccb'], dragon: ['#fb923c', '#ffedd5'], monster: ['#84cc16', '#ecfccb'] } },
-  { id: 'berry', name: 'Berry', unlock: { type: 'xp', xp: 120 }, colors: { robot: ['#e879f9', '#fae8ff'], dragon: ['#f472b6', '#fce7f3'], monster: ['#f43f5e', '#ffe4e6'] } },
-  { id: 'sky', name: 'Sky', unlock: { type: 'xp', xp: 250 }, colors: { robot: ['#0ea5e9', '#e0f2fe'], dragon: ['#38bdf8', '#e0f2fe'], monster: ['#06b6d4', '#cffafe'] } },
-  { id: 'sunset', name: 'Sunset', unlock: { type: 'xp', xp: 450 }, colors: { robot: ['#f97316', '#ffedd5'], dragon: ['#ef4444', '#fee2e2'], monster: ['#fb923c', '#fff7ed'] } },
-  { id: 'mint', name: 'Mint', unlock: { type: 'group', group: 3 }, colors: { robot: ['#2dd4bf', '#ccfbf1'], dragon: ['#84cc16', '#ecfccb'], monster: ['#14b8a6', '#ccfbf1'] } },
-  { id: 'midnight', name: 'Midnight', unlock: { type: 'xp', xp: 800 }, colors: { robot: ['#1e293b', '#94a3b8'], dragon: ['#312e81', '#a5b4fc'], monster: ['#4c1d95', '#c4b5fd'] } },
-  { id: 'rose', name: 'Rose', unlock: { type: 'group', group: 9 }, colors: { robot: ['#f9a8d4', '#fdf2f8'], dragon: ['#c084fc', '#f3e8ff'], monster: ['#fda4af', '#fff1f2'] } },
-  { id: 'golden', name: 'Golden', unlock: { type: 'xp', xp: 1500 }, colors: { robot: ['#fbbf24', '#fef3c7'], dragon: ['#f59e0b', '#fde68a'], monster: ['#eab308', '#fef9c3'] } },
+  { id: 'classic', name: 'Classic', unlock: { type: 'default' }, colors: { robot: ['#60a5fa', '#dbeafe'], dragon: ['#22c55e', '#bbf7d0'], monster: ['#a855f7', '#f3e8ff'], monkey: ['#a16207', '#fde68a'] } },
+  { id: 'lime', name: 'Lime', unlock: { type: 'xp', xp: 40 }, colors: { robot: ['#a3e635', '#ecfccb'], dragon: ['#fb923c', '#ffedd5'], monster: ['#84cc16', '#ecfccb'], monkey: ['#65a30d', '#ecfccb'] } },
+  { id: 'berry', name: 'Berry', unlock: { type: 'xp', xp: 120 }, colors: { robot: ['#e879f9', '#fae8ff'], dragon: ['#f472b6', '#fce7f3'], monster: ['#f43f5e', '#ffe4e6'], monkey: ['#be185d', '#fbcfe8'] } },
+  { id: 'sky', name: 'Sky', unlock: { type: 'xp', xp: 250 }, colors: { robot: ['#0ea5e9', '#e0f2fe'], dragon: ['#38bdf8', '#e0f2fe'], monster: ['#06b6d4', '#cffafe'], monkey: ['#0284c7', '#bae6fd'] } },
+  { id: 'sunset', name: 'Sunset', unlock: { type: 'xp', xp: 450 }, colors: { robot: ['#f97316', '#ffedd5'], dragon: ['#ef4444', '#fee2e2'], monster: ['#fb923c', '#fff7ed'], monkey: ['#ea580c', '#fed7aa'] } },
+  { id: 'mint', name: 'Mint', unlock: { type: 'group', group: 3 }, colors: { robot: ['#2dd4bf', '#ccfbf1'], dragon: ['#84cc16', '#ecfccb'], monster: ['#14b8a6', '#ccfbf1'], monkey: ['#0d9488', '#99f6e4'] } },
+  { id: 'midnight', name: 'Midnight', unlock: { type: 'xp', xp: 800 }, colors: { robot: ['#1e293b', '#94a3b8'], dragon: ['#312e81', '#a5b4fc'], monster: ['#4c1d95', '#c4b5fd'], monkey: ['#27272a', '#a1a1aa'] } },
+  { id: 'rose', name: 'Rose', unlock: { type: 'group', group: 9 }, colors: { robot: ['#f9a8d4', '#fdf2f8'], dragon: ['#c084fc', '#f3e8ff'], monster: ['#fda4af', '#fff1f2'], monkey: ['#e879a8', '#ffe4e6'] } },
+  { id: 'golden', name: 'Golden', unlock: { type: 'xp', xp: 1500 }, colors: { robot: ['#fbbf24', '#fef3c7'], dragon: ['#f59e0b', '#fde68a'], monster: ['#eab308', '#fef9c3'], monkey: ['#ca8a04', '#fef08a'] } },
 ]
 
 export const PARTS: Part[] = [
