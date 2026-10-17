@@ -18,7 +18,7 @@ interface Props {
 
 const INK = '#1e1b4b'
 
-/** The three mascots, drawn in SVG. Parts are layered: back aura → back outfit → body (+level features) → face → outfit → hat → front aura. */
+/** The five mascots, drawn in SVG. Parts are layered: back aura → back outfit → body (+level features) → face → outfit → hat → front aura. */
 export function Character({ base, look, level = 1, mood = 'idle', size = 160, className = '' }: Props) {
   const lk = look ?? defaultLook(base)
   const colors = colorOf(lk, base)
@@ -70,6 +70,8 @@ export function Character({ base, look, level = 1, mood = 'idle', size = 160, cl
       {base === 'robot' && <Robot ctx={ctx} />}
       {base === 'dragon' && <Dragon ctx={ctx} />}
       {base === 'monster' && <Monster ctx={ctx} />}
+      {base === 'monkey' && <Monkey ctx={ctx} />}
+      {base === 'croc' && <Croc ctx={ctx} />}
       {face && <Face kind={face} ctx={ctx} />}
       {outfit && <OutfitFront kind={outfit} ctx={ctx} />}
       {hat && <Hat kind={hat} ctx={ctx} />}
@@ -90,6 +92,8 @@ const GEO: Record<CharacterBase, Geo> = {
   robot: { top: 38, eyeY: 74, neck: 122 },
   dragon: { top: 44, eyeY: 74, neck: 118 },
   monster: { top: 46, eyeY: 88, neck: 150 },
+  monkey: { top: 36, eyeY: 78, neck: 128 },
+  croc: { top: 40, eyeY: 62, neck: 118 },
 }
 interface Ctx {
   base: CharacterBase
@@ -306,6 +310,110 @@ function Monster({ ctx }: { ctx: Ctx }) {
         <g className="aura-float">
           <circle cx={56} cy={50} r={9} fill="#fde047" opacity={0.9} />
           <circle cx={150} cy={40} r={6} fill="#fde047" opacity={0.9} />
+        </g>
+      )}
+    </g>
+  )
+}
+
+function Monkey({ ctx }: { ctx: Ctx }) {
+  const { body, accent, mood, blink, level } = ctx
+  return (
+    <g>
+      {/* tail: curls up behind; gets a bright tip at level 3+ */}
+      <path d="M138 168 q 52 4 46 -44 q -4 -22 -24 -16" fill="none" stroke={INK} strokeWidth={16} strokeLinecap="round" />
+      <path d="M138 168 q 52 4 46 -44 q -4 -22 -24 -16" fill="none" stroke={body} strokeWidth={10} strokeLinecap="round" />
+      {level >= 3 && <circle cx={160} cy={108} r={8} fill={accent} stroke={INK} strokeWidth={3} />}
+      {/* arms */}
+      <path d="M64 126 q -16 14 -8 36" fill="none" stroke={INK} strokeWidth={18} strokeLinecap="round" />
+      <path d="M64 126 q -16 14 -8 36" fill="none" stroke={body} strokeWidth={12} strokeLinecap="round" />
+      <path d="M136 126 q 16 14 8 36" fill="none" stroke={INK} strokeWidth={18} strokeLinecap="round" />
+      <path d="M136 126 q 16 14 8 36" fill="none" stroke={body} strokeWidth={12} strokeLinecap="round" />
+      <circle cx={56} cy={164} r={9} fill={accent} stroke={INK} strokeWidth={3} />
+      <circle cx={144} cy={164} r={9} fill={accent} stroke={INK} strokeWidth={3} />
+      {/* banana at level 2+ */}
+      {level >= 2 && (
+        <g transform="translate(144 164) rotate(-25)">
+          <path d="M-4 -26 q 20 6 18 30 q -2 14 -16 18 q 8 -16 2 -30 z" fill="#fde047" stroke={INK} strokeWidth={3} strokeLinejoin="round" />
+          <path d="M-4 -26 l -2 -6" stroke={INK} strokeWidth={4} strokeLinecap="round" />
+        </g>
+      )}
+      {/* body */}
+      <ellipse cx={100} cy={146} rx={42} ry={40} fill={body} stroke={INK} strokeWidth={4} />
+      <ellipse cx={100} cy={152} rx={26} ry={28} fill={accent} />
+      {/* feet */}
+      <ellipse cx={76} cy={186} rx={18} ry={9} fill={accent} stroke={INK} strokeWidth={3} />
+      <ellipse cx={124} cy={186} rx={18} ry={9} fill={accent} stroke={INK} strokeWidth={3} />
+      {/* ears */}
+      <circle cx={46} cy={80} r={18} fill={body} stroke={INK} strokeWidth={4} />
+      <circle cx={46} cy={80} r={9} fill={accent} />
+      <circle cx={154} cy={80} r={18} fill={body} stroke={INK} strokeWidth={4} />
+      <circle cx={154} cy={80} r={9} fill={accent} />
+      {/* head */}
+      <ellipse cx={100} cy={80} rx={50} ry={44} fill={body} stroke={INK} strokeWidth={4} />
+      {/* hair tufts grow with level */}
+      <path d="M92 38 q 8 -16 16 0" fill="none" stroke={INK} strokeWidth={4} strokeLinecap="round" />
+      {level >= 2 && <path d="M80 42 q 2 -14 12 -6 M108 36 q 10 -8 12 6" fill="none" stroke={INK} strokeWidth={4} strokeLinecap="round" />}
+      {/* face patch */}
+      <circle cx={80} cy={78} r={21} fill={accent} />
+      <circle cx={120} cy={78} r={21} fill={accent} />
+      <ellipse cx={100} cy={98} rx={30} ry={22} fill={accent} />
+      <circle cx={93} cy={92} r={2.5} fill={INK} />
+      <circle cx={107} cy={92} r={2.5} fill={INK} />
+      <Eyes cx1={82} cx2={118} cy={78} r={11} blink={blink} mood={mood} />
+      <Mouth cx={100} cy={102} mood={mood} width={28} />
+      {level >= 4 && (
+        <g className="aura-float">
+          <circle cx={36} cy={44} r={8} fill="#fde047" opacity={0.9} />
+          <circle cx={166} cy={36} r={6} fill="#fde047" opacity={0.9} />
+        </g>
+      )}
+    </g>
+  )
+}
+
+function Croc({ ctx }: { ctx: Ctx }) {
+  const { body, accent, mood, blink, level } = ctx
+  return (
+    <g>
+      {/* tail */}
+      <path d="M70 164 q -44 6 -48 -26 q 0 -12 8 -14" fill="none" stroke={INK} strokeWidth={18} strokeLinecap="round" />
+      <path d="M70 164 q -44 6 -48 -26 q 0 -12 8 -14" fill="none" stroke={body} strokeWidth={12} strokeLinecap="round" />
+      {level >= 3 && <path d="M52 166 l -4 -14 l 12 8 z M36 156 l -10 -8 l 14 -2 z" fill={accent} stroke={INK} strokeWidth={2} strokeLinejoin="round" />}
+      {/* body */}
+      <ellipse cx={100} cy={140} rx={46} ry={44} fill={body} stroke={INK} strokeWidth={4} />
+      <ellipse cx={100} cy={150} rx={28} ry={30} fill={accent} />
+      <path d="M86 146 h28 M88 156 h24 M90 166 h20" stroke={INK} strokeWidth={2} opacity={0.25} strokeLinecap="round" />
+      {/* arms tucked in */}
+      <path d="M62 128 q -12 14 -4 30" fill="none" stroke={INK} strokeWidth={16} strokeLinecap="round" />
+      <path d="M62 128 q -12 14 -4 30" fill="none" stroke={body} strokeWidth={10} strokeLinecap="round" />
+      <path d="M138 128 q 12 14 4 30" fill="none" stroke={INK} strokeWidth={16} strokeLinecap="round" />
+      <path d="M138 128 q 12 14 4 30" fill="none" stroke={body} strokeWidth={10} strokeLinecap="round" />
+      {/* feet */}
+      <ellipse cx={78} cy={184} rx={17} ry={9} fill={body} stroke={INK} strokeWidth={3} />
+      <ellipse cx={122} cy={184} rx={17} ry={9} fill={body} stroke={INK} strokeWidth={3} />
+      {/* back ridge on the head, more at level 2+ */}
+      {level >= 2 && <path d="M88 44 l 5 -10 l 5 10 M102 44 l 5 -10 l 5 10" fill={accent} stroke={INK} strokeWidth={2} strokeLinejoin="round" />}
+      {/* head and long snout */}
+      <ellipse cx={100} cy={76} rx={50} ry={38} fill={body} stroke={INK} strokeWidth={4} />
+      <rect x={50} y={84} width={100} height={42} rx={20} fill={body} stroke={INK} strokeWidth={4} />
+      <rect x={58} y={106} width={84} height={16} rx={8} fill={accent} />
+      <circle cx={84} cy={92} r={3.5} fill={INK} />
+      <circle cx={116} cy={92} r={3.5} fill={INK} />
+      {/* eyes sit on top bumps */}
+      <circle cx={78} cy={60} r={16} fill={body} stroke={INK} strokeWidth={4} />
+      <circle cx={122} cy={60} r={16} fill={body} stroke={INK} strokeWidth={4} />
+      <Eyes cx1={78} cx2={122} cy={62} r={11} blink={blink} mood={mood} />
+      <Mouth cx={100} cy={108} mood={mood} width={60} />
+      {mood !== 'happy' && mood !== 'talking' && (
+        <g fill="white" stroke={INK} strokeWidth={1.5} strokeLinejoin="round">
+          <path d="M66 108 l 4 8 l 4 -8 z M126 108 l 4 8 l 4 -8 z M82 112 l 3 7 l 3 -7 z M112 112 l 3 7 l 3 -7 z" />
+        </g>
+      )}
+      {level >= 4 && (
+        <g className="aura-float">
+          <circle cx={30} cy={50} r={8} fill="#fde047" opacity={0.9} />
+          <circle cx={168} cy={38} r={6} fill="#fde047" opacity={0.9} />
         </g>
       )}
     </g>

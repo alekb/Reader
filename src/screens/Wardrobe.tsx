@@ -51,7 +51,7 @@ export function Wardrobe() {
 
       <div className="grid grid-cols-3 gap-2">
         {CHARACTERS.map((c) => (
-          <button key={c.base} onClick={() => pick(c.base)} className={`tile py-2 text-lg font-extrabold ${progress.character === c.base ? 'bg-sun ring-4 ring-grape' : ''}`}>
+          <button key={c.base} onClick={() => pick(c.base)} className={`tile flex-col py-2 text-base font-extrabold leading-tight ${progress.character === c.base ? 'bg-sun ring-4 ring-grape' : ''}`}>
             {c.emoji} {c.name}
           </button>
         ))}
