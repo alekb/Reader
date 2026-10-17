@@ -89,8 +89,7 @@ users/{uid}/recordings/{key}                 parent-recorded sound clips (base64
 To build locally instead, the Android project is in `android/` and you need Android Studio (or the Android SDK + JDK 17+):
 
 ```bash
-npm run build
-npx cap sync android      # copies dist/ into the Android project
+npm run android:sync     # builds for Android (NATIVE_BUILD=1, no service worker) and copies dist/ into the Android project
 npx cap open android      # opens Android Studio → Run ▶ or Build → Generate Signed APK / Bundle
 ```
 
@@ -125,7 +124,7 @@ The app is a PWA: on Android Chrome it can be installed to the home screen. The 
 
 All sounds, letter names, words, sentences and the mascot's lines are pre-generated with **Google Cloud Text-to-Speech** and shipped with a `manifest.json` per voice: female (`en-US-Neural2-F`) in `public/audio/`, male (`en-US-Neural2-J`) in `public/audio/male/`. The app plays these clips first, on the web and on Android, so speech is consistent, works offline and needs no API key at runtime. Anything not in the manifest (for example a sentence that includes the child's name) falls back to the device's own voice.
 
-**Female or male voice:** parents choose in Parents → **Settings** → **Voice**. The choice syncs with the rest of the settings, and the device-voice fallback follows it too (it picks a male or female system voice where the device has one). If the male clip set has not been generated yet, Male uses the device's male voice, except for the pure letter sounds, which keep the female studio clips because device voices cannot say a clipped "t".
+**Female or male voice:** male is the default; parents can switch in Parents → **Settings** → **Voice** (children whose settings were never changed follow the default). The choice syncs with the rest of the settings, and the device-voice fallback follows it too (it picks a male or female system voice where the device has one). If the male clip set has not been generated yet, Male uses the device's male voice, except for the pure letter sounds, which keep the female studio clips because device voices cannot say a clipped "t".
 
 Pure consonant sounds are the hard part: TTS engines cannot say a lone "t". The generator (`scripts/generate-audio.mjs`) synthesizes each consonant inside a syllable from IPA and cuts the vowel off with a band-energy analysis, so you get a hissing "sss", a humming "mmm" and a clipped "t" rather than "tuh".
 

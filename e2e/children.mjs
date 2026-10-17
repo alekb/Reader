@@ -58,15 +58,15 @@ await page.click('button.tile:has-text("Mia")')
 await page.waitForSelector('text=Play')
 if (!(await page.locator('text=/⭐ 77/').count())) fail("Mia's stars were lost")
 
-// 3. Dashboard: switch the child shown, give Mia the male voice, then remove Mia.
+// 3. Dashboard: switch the child shown, give Mia the female voice, then remove Mia.
 await dashboard()
 await shot('04-dashboard-children')
 await page.click('button:has-text("Settings")')
-await page.getByRole('radio', { name: 'Male', exact: true }).click()
+await page.getByRole('radio', { name: 'Female', exact: true }).click()
 await page.getByRole('tab', { name: /Leo/ }).click()
-if ((await page.locator('[role=radio][aria-checked=true]').innerText()) !== 'Female') fail("Leo's voice changed with Mia's")
+if ((await page.locator('[role=radio][aria-checked=true]').innerText()) !== 'Male') fail("Leo's voice changed with Mia's")
 await page.getByRole('tab', { name: /Mia/ }).click()
-if ((await page.locator('[role=radio][aria-checked=true]').innerText()) !== 'Male') fail("Mia's voice was not kept")
+if ((await page.locator('[role=radio][aria-checked=true]').innerText()) !== 'Female') fail("Mia's voice was not kept")
 await page.click('button:has-text("Remove Mia")')
 await shot('05-remove-confirm')
 await page.click('button:has-text("Yes, remove Mia")')
@@ -91,7 +91,7 @@ if (!(await page.locator('text=/⭐ 42/').count())) fail('one-child stars were l
 await page.waitForTimeout(300)
 const upgraded = await stored()
 if (upgraded.progress.id !== 'main') fail(`upgraded child id is ${upgraded.progress.id}, expected main`)
-if (upgraded.progress.settings.voice !== 'female') fail('upgraded child has no voice setting')
+if (upgraded.progress.settings.voice !== 'male') fail('upgraded child has no voice setting')
 
 console.log('errors:', errors.length ? errors : 'none')
 await browser.close()

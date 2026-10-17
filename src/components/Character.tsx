@@ -19,7 +19,9 @@ interface Props {
 const INK = '#1e1b4b'
 
 /** The five mascots, drawn in SVG. Parts are layered: back aura → back outfit → body (+level features) → face → outfit → hat → front aura. */
-export function Character({ base, look, level = 1, mood = 'idle', size = 160, className = '' }: Props) {
+export function Character({ base: savedBase, look, level = 1, mood = 'idle', size = 160, className = '' }: Props) {
+  // A buddy added by a newer version of the app (synced from another device) is drawn as Bolt.
+  const base: CharacterBase = Object.hasOwn(GEO, savedBase) ? savedBase : 'robot'
   const lk = look ?? defaultLook(base)
   const colors = colorOf(lk, base)
   const [blink, setBlink] = useState(false)

@@ -26,22 +26,22 @@ describe('several children on one device', () => {
     expect(S().progress!.xp).toBe(0)
     expect(names()).toEqual(['Leo', 'Mia'])
 
-    S().setSettings({ voice: 'male' })
+    S().setSettings({ voice: 'female' })
     S().switchChild(leo)
     expect(S().progress!.childName).toBe('Leo')
     expect(S().progress!.xp).toBe(leoXp)
-    expect(S().progress!.settings.voice).toBe('female')
-    expect(S().others[mia].progress.settings.voice).toBe('male')
+    expect(S().progress!.settings.voice).toBe('male')
+    expect(S().others[mia].progress.settings.voice).toBe('female')
   })
 
   it('starts one child over, keeping name, buddy and settings', () => {
     S().setup('Leo', 'monster')
-    S().setSettings({ voice: 'male' })
+    S().setSettings({ voice: 'female' })
     S().recordResult({ kind: 'word', id: 'sat', correct: true, ms: 900 }, 'blend')
     const id = S().progress!.id
     S().resetChild(id)
     const p = S().progress!
-    expect([p.id, p.childName, p.character, p.settings.voice, p.xp]).toEqual([id, 'Leo', 'monster', 'male', 0])
+    expect([p.id, p.childName, p.character, p.settings.voice, p.xp]).toEqual([id, 'Leo', 'monster', 'female', 0])
   })
 
   it('removing the child playing hands over to the next one, then to the welcome screen', () => {

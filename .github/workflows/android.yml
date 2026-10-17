@@ -80,7 +80,10 @@ jobs:
         with:
           name: reader-quest-web
           path: dist
-      - run: npx cap sync android
+      - name: Build the app for Android
+        run: npm run build && npx cap sync android
+        env:
+          NATIVE_BUILD: '1'
       - name: Build debug APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
         env:
@@ -109,6 +112,7 @@ jobs:
           npx cap sync android
           cd android && ./gradlew assembleRelease --no-daemon
         env:
+          NATIVE_BUILD: '1'
           # Turns on the in-app "new version" check (the parent dashboard offers the download).
           VITE_UPDATE_URL: https://github.com/${{ github.repository }}/releases/download/latest-apk/version.json
           ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
@@ -167,6 +171,7 @@ jobs:
           npx cap sync android
           cd android && ./gradlew bundleRelease --no-daemon
         env:
+          NATIVE_BUILD: '1'
           ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}

@@ -5,6 +5,7 @@
  *
  * Character levels (the buddy itself growing) are also defined here.
  */
+import { CHARACTERS, CHARACTER_BY_BASE } from './characters'
 import type { CharacterBase } from './characters'
 import { GROUPS } from './gpcs'
 
@@ -47,8 +48,7 @@ const colorPart = (base: CharacterBase, id: string, name: string, body: string, 
 })
 const part = (slot: Slot, id: string, name: string, icon: string, unlock: Unlock): Part => ({ id: `${slot}-${id}`, slot, name, icon, unlock })
 
-const NAMES: Record<CharacterBase, string> = { robot: 'Bolt', dragon: 'Ember', monster: 'Fuzz', monkey: 'Bongo', croc: 'Chomp' }
-const BASES: CharacterBase[] = ['robot', 'dragon', 'monster', 'monkey', 'croc']
+const BASES: CharacterBase[] = CHARACTERS.map((c) => c.base)
 
 const COLOR_TIERS: { id: string; name: string; unlock: Unlock; colors: Record<CharacterBase, [string, string]> }[] = [
   { id: 'classic', name: 'Classic', unlock: { type: 'default' }, colors: { robot: ['#60a5fa', '#dbeafe'], dragon: ['#22c55e', '#bbf7d0'], monster: ['#a855f7', '#f3e8ff'], monkey: ['#a16207', '#fde68a'], croc: ['#16a34a', '#d9f99d'] } },
@@ -56,15 +56,15 @@ const COLOR_TIERS: { id: string; name: string; unlock: Unlock; colors: Record<Ch
   { id: 'berry', name: 'Berry', unlock: { type: 'xp', xp: 120 }, colors: { robot: ['#e879f9', '#fae8ff'], dragon: ['#f472b6', '#fce7f3'], monster: ['#f43f5e', '#ffe4e6'], monkey: ['#be185d', '#fbcfe8'], croc: ['#c026d3', '#fae8ff'] } },
   { id: 'sky', name: 'Sky', unlock: { type: 'xp', xp: 250 }, colors: { robot: ['#0369a1', '#bae6fd'], dragon: ['#38bdf8', '#e0f2fe'], monster: ['#06b6d4', '#cffafe'], monkey: ['#0284c7', '#bae6fd'], croc: ['#0891b2', '#cffafe'] } },
   { id: 'sunset', name: 'Sunset', unlock: { type: 'xp', xp: 450 }, colors: { robot: ['#f97316', '#ffedd5'], dragon: ['#ef4444', '#fee2e2'], monster: ['#fb923c', '#fff7ed'], monkey: ['#ea580c', '#fed7aa'], croc: ['#d97706', '#fef3c7'] } },
-  { id: 'mint', name: 'Mint', unlock: { type: 'group', group: 3 }, colors: { robot: ['#2dd4bf', '#ccfbf1'], dragon: ['#84cc16', '#ecfccb'], monster: ['#14b8a6', '#ccfbf1'], monkey: ['#0d9488', '#99f6e4'], croc: ['#10b981', '#d1fae5'] } },
+  { id: 'mint', name: 'Mint', unlock: { type: 'group', group: 3 }, colors: { robot: ['#2dd4bf', '#ccfbf1'], dragon: ['#84cc16', '#ecfccb'], monster: ['#14b8a6', '#ccfbf1'], monkey: ['#0d9488', '#99f6e4'], croc: ['#2dd4bf', '#ccfbf1'] } },
   { id: 'midnight', name: 'Midnight', unlock: { type: 'xp', xp: 800 }, colors: { robot: ['#1e293b', '#94a3b8'], dragon: ['#312e81', '#a5b4fc'], monster: ['#4c1d95', '#c4b5fd'], monkey: ['#27272a', '#a1a1aa'], croc: ['#134e4a', '#5eead4'] } },
   { id: 'rose', name: 'Rose', unlock: { type: 'group', group: 9 }, colors: { robot: ['#f9a8d4', '#fdf2f8'], dragon: ['#c084fc', '#f3e8ff'], monster: ['#fda4af', '#fff1f2'], monkey: ['#e879a8', '#ffe4e6'], croc: ['#fb7185', '#ffe4e6'] } },
-  { id: 'golden', name: 'Golden', unlock: { type: 'xp', xp: 1500 }, colors: { robot: ['#fbbf24', '#fef3c7'], dragon: ['#f59e0b', '#fde68a'], monster: ['#eab308', '#fef9c3'], monkey: ['#ca8a04', '#fef08a'], croc: ['#eab308', '#fef9c3'] } },
+  { id: 'golden', name: 'Golden', unlock: { type: 'xp', xp: 1500 }, colors: { robot: ['#fbbf24', '#fef3c7'], dragon: ['#f59e0b', '#fde68a'], monster: ['#eab308', '#fef9c3'], monkey: ['#facc15', '#fef9c3'], croc: ['#eab308', '#fef9c3'] } },
 ]
 
 export const PARTS: Part[] = [
   // ---- colours (9 per character) ----
-  ...BASES.flatMap((b) => COLOR_TIERS.map((t) => colorPart(b, t.id, `${t.name} ${NAMES[b]}`, t.colors[b][0], t.colors[b][1], t.unlock))),
+  ...BASES.flatMap((b) => COLOR_TIERS.map((t) => colorPart(b, t.id, `${t.name} ${CHARACTER_BY_BASE[b].name}`, t.colors[b][0], t.colors[b][1], t.unlock))),
   // ---- hats ----
   part('hat', 'cap', 'Beach Cap', '🧢', { type: 'group', group: 1 }),
   part('hat', 'party', 'Party Hat', '🎉', { type: 'streak', days: 2 }),
@@ -149,8 +149,23 @@ export function defaultPartIds(): string[] {
   return UNLOCKABLES.filter((p) => p.unlock.type === 'default').map((p) => p.id)
 }
 
+const tierOf = (p: Part | undefined) => (p?.slot === 'color' && p.base ? p.id.slice(`color-${p.base}-`.length) : null)
+
+/**
+ * A colour tier unlocks for every buddy at once, so a tier owned for one buddy is owned
+ * for all of them. Returns the colour part ids of every buddy for the tiers in `unlocked`,
+ * which also covers buddies added after those tiers were earned.
+ */
+export function colorTierIds(unlocked: string[]): string[] {
+  const tiers = new Set(unlocked.map((id) => tierOf(PART_BY_ID[id])).filter((t) => t !== null))
+  return PARTS.filter((p) => {
+    const t = tierOf(p)
+    return t !== null && tiers.has(t)
+  }).map((p) => p.id)
+}
+
 export function colorOf(look: Look, base: CharacterBase): { body: string; accent: string } {
-  const p = (look.color && PART_BY_ID[look.color]) || PART_BY_ID[`color-${base}-classic`]
+  const p = (look.color && PART_BY_ID[look.color]) || PART_BY_ID[`color-${base}-classic`] || PART_BY_ID['color-robot-classic']
   return { body: p.body!, accent: p.accent! }
 }
 

@@ -14,6 +14,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registered in main.tsx, on the web only.
+      injectRegister: null,
+      // Android builds (NATIVE_BUILD=1) need no service worker; theirs removes the one older
+      // APKs registered and reloads the app, so an update shows on its first launch.
+      selfDestroying: process.env.NATIVE_BUILD === '1',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
         name: 'Reader Quest',

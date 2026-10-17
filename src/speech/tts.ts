@@ -23,7 +23,7 @@ export function setVoiceRate(rate: number) {
 }
 
 export type { VoiceGender }
-let gender: VoiceGender = 'female'
+let gender: VoiceGender = 'male'
 /** Which voice the parent picked. Bundled clips and the device voice both follow it. */
 export function setVoiceGender(g: VoiceGender) {
   if (g === gender) return

@@ -262,9 +262,11 @@ function normalize(pcm, peakTarget = 0.7) {
 function loopTo(pcm, targetMs) {
   const target = Math.round((SR * targetMs) / 1000)
   if (pcm.length >= target || pcm.length < SR * 0.04) return pcm
-  const xf = Math.round(SR * 0.015)
+  const fullXf = Math.round(SR * 0.015)
   const core = pcm.subarray(Math.round(pcm.length * 0.2), Math.round(pcm.length * 0.8))
-  if (core.length <= xf * 2) return pcm
+  if (core.length <= fullXf * 2) return pcm
+  // The crossfade must fit inside the shortest piece (the last 20%), or a short sound overruns.
+  const xf = Math.min(fullXf, Math.floor(pcm.length * 0.2))
   const pieces = [pcm.subarray(0, Math.round(pcm.length * 0.8))]
   let len = pieces[0].length
   while (len < target) {
