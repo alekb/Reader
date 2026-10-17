@@ -89,8 +89,7 @@ users/{uid}/recordings/{key}                 parent-recorded sound clips (base64
 To build locally instead, the Android project is in `android/` and you need Android Studio (or the Android SDK + JDK 17+):
 
 ```bash
-npm run build
-npx cap sync android      # copies dist/ into the Android project
+npm run android:sync     # builds for Android (NATIVE_BUILD=1, no service worker) and copies dist/ into the Android project
 npx cap open android      # opens Android Studio → Run ▶ or Build → Generate Signed APK / Bundle
 ```
 

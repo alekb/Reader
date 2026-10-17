@@ -1,5 +1,5 @@
 import type { CharacterBase } from '../content/characters'
-import { defaultLook, defaultPartIds, PART_BY_ID } from '../content/parts'
+import { colorTierIds, defaultLook, defaultPartIds, PART_BY_ID } from '../content/parts'
 import type { ActivityResult, Progress } from './types'
 import { applyAnswer, newItem } from './scheduler'
 
@@ -104,10 +104,12 @@ export function migrateProgress(raw: unknown): Progress | null {
   const p = raw as Record<string, unknown>
   if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) {
     const cur = backfill(p as unknown as Progress)
-    const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds()])]
+    // Colour tiers already earned also unlock for buddies added since.
+    const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds(), ...colorTierIds(cur.unlockedParts)])]
     return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
   }
-  const base = (['robot', 'dragon', 'monster', 'monkey', 'croc'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
+  // Version 1 had only the first three buddies.
+  const base = (['robot', 'dragon', 'monster'].includes(String(p.character)) ? p.character : 'robot') as CharacterBase
   const fresh = createProgress(String(p.childName ?? 'Explorer'), base, Number(p.createdAt ?? Date.now()), LEGACY_CHILD_ID)
   const out: Progress = { ...backfill({ ...fresh, ...(p as Partial<Progress>) }), version: 2, character: base, look: defaultLook(base), unlockedParts: [...fresh.unlockedParts], stickers: [], lastEggDay: '' }
   // Translate the old skin catalogue (v1) into parts.
@@ -122,7 +124,7 @@ export function migrateProgress(raw: unknown): Progress | null {
     if (PART_BY_ID[id] && !out.unlockedParts.includes(id)) out.unlockedParts.push(id)
   }
   for (const sk of oldSkins) {
-    const m = /^(robot|dragon|monster|monkey|croc)-(.+)$/.exec(sk)
+    const m = /^(robot|dragon|monster)-(.+)$/.exec(sk)
     if (!m) continue
     const [, b, key] = m
     if (tierColor[key]) add(`color-${b}-${tierColor[key]}`)

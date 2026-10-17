@@ -4,6 +4,7 @@ import { WORDS, letterSegments } from '../content/words'
 import { SENTENCES } from '../content/sentences'
 import { TRICKY_WORDS } from '../content/trickyWords'
 import { PARTS, levelFor, defaultLook } from '../content/parts'
+import { CHARACTERS } from '../content/characters'
 import { pickSticker, STICKERS } from '../content/stickers'
 import { migrateProgress } from './progress'
 import { newlyUnlockedIds } from './curriculum'
@@ -66,7 +67,7 @@ describe('content integrity', () => {
     }
   })
   it('every character has a default colour part and part ids are unique', () => {
-    for (const base of ['robot', 'dragon', 'monster', 'monkey', 'croc'] as const) {
+    for (const { base } of CHARACTERS) {
       expect(PARTS.filter((p) => p.slot === 'color' && p.base === base && p.unlock.type === 'default').length).toBe(1)
       expect(PARTS.find((p) => p.id === defaultLook(base).color)).toBeDefined()
     }
@@ -207,6 +208,14 @@ describe('parts, levels and stickers', () => {
     const m = migrateProgress(p)!
     expect(m).not.toBe(p)
     expect(m.unlockedParts).toContain('paint-blue')
+    expect(migrateProgress(m)).toBe(m)
+  })
+  it('back-fills earned colour tiers for buddies added later', () => {
+    const p = { ...createProgress('Kid', 'robot', Date.now()), unlockedParts: ['color-robot-classic', 'color-robot-lime', 'hat-cap'] }
+    const m = migrateProgress(p)!
+    for (const { base } of CHARACTERS) expect(m.unlockedParts).toContain(`color-${base}-lime`)
+    expect(m.unlockedParts).not.toContain('color-monkey-berry')
+    expect(m.unlockedParts).not.toContain('hat-party')
     expect(migrateProgress(m)).toBe(m)
   })
   it('sticker picks prefer unowned stickers', () => {
