@@ -91,7 +91,7 @@ if (!(await page.locator('text=/⭐ 42/').count())) fail('one-child stars were l
 await page.waitForTimeout(300)
 const upgraded = await stored()
 if (upgraded.progress.id !== 'main') fail(`upgraded child id is ${upgraded.progress.id}, expected main`)
-if (upgraded.progress.settings.voice !== 'female') fail('upgraded child has no voice setting')
+if (upgraded.progress.settings.voice !== 'male') fail('upgraded child has no voice setting')
 
 console.log('errors:', errors.length ? errors : 'none')
 await browser.close()

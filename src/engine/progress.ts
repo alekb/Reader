@@ -3,7 +3,7 @@ import { colorTierIds, defaultLook, defaultPartIds, PART_BY_ID } from '../conten
 import type { ActivityResult, Progress } from './types'
 import { applyAnswer, newItem } from './scheduler'
 
-export const DEFAULT_SETTINGS: Progress['settings'] = { sfx: true, voiceRate: 0.9, voice: 'female', changedAt: 0 }
+export const DEFAULT_SETTINGS: Progress['settings'] = { sfx: true, voiceRate: 0.9, voice: 'male', changedAt: 0 }
 
 /** The one child a device or account had before multiple children were supported. */
 export const LEGACY_CHILD_ID = 'main'
@@ -103,7 +103,9 @@ export function migrateProgress(raw: unknown): Progress | null {
   if (!raw || typeof raw !== 'object') return null
   const p = raw as Record<string, unknown>
   if (p.version === 2 && p.look && Array.isArray(p.unlockedParts)) {
-    const cur = backfill(p as unknown as Progress)
+    let cur = backfill(p as unknown as Progress)
+    // The default voice is male: children whose settings were never changed follow it.
+    if (cur.settings.changedAt === 0 && cur.settings.voice !== DEFAULT_SETTINGS.voice) cur = { ...cur, settings: { ...cur.settings, voice: DEFAULT_SETTINGS.voice } }
     // Colour tiers already earned also unlock for buddies added since.
     const unlockedParts = [...new Set([...cur.unlockedParts, ...defaultPartIds(), ...colorTierIds(cur.unlockedParts)])]
     return unlockedParts.length === cur.unlockedParts.length ? cur : { ...cur, unlockedParts }
