@@ -3,12 +3,12 @@ import { GPCS, GROUPS, GPC_BY_ID } from '../content/gpcs'
 import { WORDS, letterSegments } from '../content/words'
 import { SENTENCES } from '../content/sentences'
 import { TRICKY_WORDS } from '../content/trickyWords'
-import { PARTS, levelFor, defaultLook } from '../content/parts'
+import { PARTS, levelFor, levelName, levelProgress, levelXp, defaultLook } from '../content/parts'
 import { CHARACTERS } from '../content/characters'
 import { pickSticker, STICKERS } from '../content/stickers'
 import { migrateProgress } from './progress'
 import { newlyUnlockedIds } from './curriculum'
-import { applyAnswer, newItem, masteryOf, bumpStreak, currentStreak, DAY_MS } from './scheduler'
+import { applyAnswer, newItem, masteryOf, bumpStreak, currentStreak, dayKey, shieldState, DAY_MS } from './scheduler'
 import { buildLesson, sentenceWords, wordGpcs } from './lessonBuilder'
 import { makeNonsenseWord } from './nonsense'
 import { advanceGroups, isGroupComplete, newItemPolicy, nextGpcToIntroduce } from './curriculum'
@@ -109,7 +109,28 @@ describe('scheduler', () => {
     expect(s.count).toBe(1)
     s = bumpStreak(s, now + DAY_MS)
     expect(s.count).toBe(2)
-    expect(currentStreak(s, now + 3 * DAY_MS)).toBe(0)
+    expect(currentStreak(s, now + 4 * DAY_MS)).toBe(0)
+  })
+  it('the shield covers one missed day a week', () => {
+    const day = (n: number) => new Date(2026, 0, 5 + n, 12).getTime()
+    let s = bumpStreak({ count: 0, lastDay: '' }, day(0))
+    s = bumpStreak(s, day(1))
+    expect(shieldState(s, day(1))).toBe('ready')
+    // Day 2 missed: on day 3 the streak is still alive and playing keeps it.
+    expect(shieldState(s, day(3))).toBe('protecting')
+    expect(currentStreak(s, day(3))).toBe(2)
+    s = bumpStreak(s, day(3))
+    expect(s).toEqual({ count: 3, lastDay: dayKey(day(3)), shieldDay: dayKey(day(2)) })
+    expect(shieldState(s, day(3))).toBe('recharging')
+    // A second miss within the week breaks it.
+    expect(currentStreak(s, day(5))).toBe(0)
+    expect(bumpStreak(s, day(5)).count).toBe(1)
+    // A week after the last covered day the shield is back.
+    s = bumpStreak(bumpStreak(bumpStreak(bumpStreak(bumpStreak(bumpStreak(s, day(4)), day(5)), day(6)), day(7)), day(8)), day(9))
+    expect(shieldState(s, day(9))).toBe('ready')
+    expect(bumpStreak(s, day(11))).toMatchObject({ count: s.count + 1, shieldDay: dayKey(day(10)) })
+    // Two missed days are never covered.
+    expect(bumpStreak(s, day(12)).count).toBe(1)
   })
 })
 
@@ -168,13 +189,22 @@ describe('nonsense words', () => {
 })
 
 describe('parts, levels and stickers', () => {
-  it('levels follow the star thresholds', () => {
+  it('levels follow the star thresholds and never run out', () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(levelXp)).toEqual([0, 100, 250, 450, 700, 1000, 1350, 1750, 2150, 2550])
     expect(levelFor(0)).toBe(1)
     expect(levelFor(99)).toBe(1)
     expect(levelFor(100)).toBe(2)
-    expect(levelFor(300)).toBe(3)
-    expect(levelFor(1500)).toBe(5)
-    expect(levelFor(99999)).toBe(5)
+    expect(levelFor(249)).toBe(2)
+    expect(levelFor(250)).toBe(3)
+    expect(levelFor(700)).toBe(5)
+    expect(levelFor(2549)).toBe(9)
+    expect(levelFor(2550)).toBe(10)
+    expect(levelProgress(2550 + 200)).toEqual({ level: 10, next: 2950, fraction: 0.5 })
+    expect([levelName(5), levelName(10), levelName(11), levelName(12)]).toEqual(['Legendary', 'Galactic', 'Galactic 2', 'Galactic 3'])
+  })
+  it('no child drops a level with the new thresholds', () => {
+    const old = (xp: number) => [0, 100, 300, 700, 1500].filter((t) => xp >= t).length
+    for (let xp = 0; xp <= 5000; xp += 5) expect(levelFor(xp)).toBeGreaterThanOrEqual(old(xp))
   })
   it('unlocks parts by stars, sessions and islands', () => {
     const now = Date.now()

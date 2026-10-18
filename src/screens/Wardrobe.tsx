@@ -4,7 +4,7 @@ import { Character } from '../components/Character'
 import { Screen, TopBar } from '../components/ui'
 import { CHARACTERS } from '../content/characters'
 import type { CharacterBase } from '../content/characters'
-import { LEVEL_NAMES, PAINTS, SLOTS, SLOT_LABEL, levelProgress, partsForSlot, unlockDescription } from '../content/parts'
+import { PAINTS, SLOTS, SLOT_LABEL, levelName, levelProgress, partsForSlot, unlockDescription } from '../content/parts'
 import type { Slot } from '../content/parts'
 import { useProgress } from '../store/progressStore'
 import { sfx } from '../speech/sfx'
@@ -41,12 +41,12 @@ export function Wardrobe() {
       <div className="flex flex-col items-center">
         <Character base={progress.character} look={progress.look} level={lp.level} mood="happy" size={170} />
         <div className="mt-1 rounded-full bg-white px-3 py-1 text-sm font-extrabold text-grape shadow">
-          Level {lp.level} · {LEVEL_NAMES[lp.level - 1]}
+          Level {lp.level} · {levelName(lp.level)}
         </div>
         <div className="mt-2 h-3 w-48 overflow-hidden rounded-full bg-ink/10">
           <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.round(lp.fraction * 100)}%` }} />
         </div>
-        <div className="text-xs font-bold text-ink/50">{lp.next ? `${lp.next - progress.xp} ⭐ to level ${lp.level + 1}` : 'Max level!'}</div>
+        <div className="text-xs font-bold text-ink/50">{`${lp.next - progress.xp} ⭐ to level ${lp.level + 1}`}</div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">

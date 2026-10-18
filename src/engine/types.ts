@@ -55,7 +55,8 @@ export interface Progress {
   sessionsCompleted: number
   /** Accuracy of the last completed session, 0..1 (1 when none). */
   lastSessionAccuracy: number
-  streak: { count: number; lastDay: string }
+  /** shieldDay: the missed day the weekly shield last covered (absent until first used). */
+  streak: { count: number; lastDay: string; shieldDay?: string }
   /** Minutes per day target shown to the child. */
   dailyGoalMin: number
   /** Audio settings. `changedAt` lets sync keep the latest choice even when another device played since. */

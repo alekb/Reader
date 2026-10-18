@@ -7,7 +7,7 @@ import fs from 'node:fs'
 
 const server = await createServer({ server: { middlewareMode: true }, logLevel: 'error', appType: 'custom' })
 const { Character } = await server.ssrLoadModule('/src/components/Character.tsx')
-const { PARTS, SLOTS, SLOT_LABEL, LEVEL_NAMES, LEVEL_XP, defaultLook, partsForSlot, unlockDescription } = await server.ssrLoadModule('/src/content/parts.ts')
+const { PARTS, SLOTS, SLOT_LABEL, levelName, levelXp, defaultLook, partsForSlot, unlockDescription } = await server.ssrLoadModule('/src/content/parts.ts')
 const { CHARACTERS } = await server.ssrLoadModule('/src/content/characters.ts')
 await server.close()
 
@@ -43,7 +43,7 @@ for (const slot of SLOTS) {
 let html2 = css + '<h1>Character levels</h1><p>The buddy grows with stars, independent of outfit.</p>'
 for (const c of CHARACTERS) {
   html2 += `<h2>${c.emoji} ${c.name}</h2><div class="grid5">`
-  for (let lvl = 1; lvl <= 5; lvl++) html2 += card(svg(c.base, defaultLook(c.base), lvl, lvl >= 4 ? 'happy' : 'idle', 150), `Level ${lvl} · ${LEVEL_NAMES[lvl - 1]}`, `${LEVEL_XP[lvl - 1]} stars`, lvl === 5 ? '#fef9c3' : '#fff')
+  for (let lvl = 1; lvl <= 5; lvl++) html2 += card(svg(c.base, defaultLook(c.base), lvl, lvl >= 4 ? 'happy' : 'idle', 150), `Level ${lvl} · ${levelName(lvl)}`, `${levelXp(lvl)} stars`, lvl === 5 ? '#fef9c3' : '#fff')
   html2 += '</div>'
 }
 

@@ -86,13 +86,45 @@ export function fragileCount(map: Record<string, ItemState>, now: number): numbe
   return Object.values(map).filter((it) => it.box <= 1 && now - it.introduced > DAY_MS).length
 }
 
-/** Update the daily streak given a completed session today. */
+/** Days a used shield takes to come back: one missed day per week is forgiven. */
+export const SHIELD_DAYS = 7
+
+/** Whole days from day key `a` to day key `b`. */
+function daysBetween(a: string, b: string): number {
+  const utc = (k: string) => {
+    const [y, m, d] = k.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((utc(b) - utc(a)) / DAY_MS)
+}
+
+/** True if the shield can cover a missed `day` (not used in the week before it). */
+function shieldCovers(streak: Progress['streak'], day: string): boolean {
+  return !streak.shieldDay || daysBetween(streak.shieldDay, day) >= SHIELD_DAYS
+}
+
+/** Update the daily streak given a completed session today. One missed day a week is covered by the shield. */
 export function bumpStreak(streak: Progress['streak'], now: number): Progress['streak'] {
   const today = dayKey(now)
   if (streak.lastDay === today) return streak
   const yesterday = dayKey(now - DAY_MS)
-  if (streak.lastDay === yesterday) return { count: streak.count + 1, lastDay: today }
-  return { count: 1, lastDay: today }
+  if (streak.lastDay === yesterday) return { ...streak, count: streak.count + 1, lastDay: today }
+  if (streak.lastDay === dayKey(now - 2 * DAY_MS) && streak.count > 0 && shieldCovers(streak, yesterday)) {
+    return { count: streak.count + 1, lastDay: today, shieldDay: yesterday }
+  }
+  return { ...streak, count: 1, lastDay: today }
+}
+
+/**
+ * The shield right now: 'protecting' when yesterday was missed and playing today keeps the streak,
+ * 'ready' when it can cover a future missed day, 'recharging' when it was used this past week.
+ */
+export function shieldState(streak: Progress['streak'], now: number): 'protecting' | 'ready' | 'recharging' {
+  const yesterday = dayKey(now - DAY_MS)
+  if (streak.count > 0 && streak.lastDay === dayKey(now - 2 * DAY_MS) && shieldCovers(streak, yesterday)) return 'protecting'
+  // The next day that could be missed: tomorrow once today is played, otherwise today.
+  const nextMiss = streak.lastDay === dayKey(now) ? dayKey(now + DAY_MS) : dayKey(now)
+  return shieldCovers(streak, nextMiss) ? 'ready' : 'recharging'
 }
 
 /** The streak as it stands right now (0 if the chain was broken before today). */
@@ -100,5 +132,5 @@ export function currentStreak(streak: Progress['streak'], now: number): number {
   const today = dayKey(now)
   const yesterday = dayKey(now - DAY_MS)
   if (streak.lastDay === today || streak.lastDay === yesterday) return streak.count
-  return 0
+  return shieldState(streak, now) === 'protecting' ? streak.count : 0
 }

@@ -32,9 +32,12 @@ Rules the engine follows (from `docs/RESEARCH.md` §10):
 - **Mastery**: an item is "mastered" after 3 correct scheduled reviews on 3 different days.
 - **Rewards never depend on accuracy**: stars come from effort. Rewards are layered so something new happens almost every session:
   - **Mix-and-match parts** (36 per buddy): body colour, hat, face, outfit and aura are separate unlocks tied to stars, islands, streaks, words read, sessions and sounds mastered.
-  - **Character levels**: the buddy itself grows at 100, 300, 700 and 1500 stars (antennas, wings, horns, jet boots, fire, auras).
+  - **Character levels**: levels never run out. Steps start at 100 stars and grow gently (100, 150, 200 …) to 400 stars a level from level 8 on. The buddy itself grows up to level 5 (antennas, wings, horns, jet boots, fire, auras); later levels bring a new title (Super, Mega, Ultra, Cosmic, Galactic, Galactic 2 …).
   - **Surprise egg**: the first finished session each day hatches a sticker for the 60-sticker book.
   - **Tricks**: tapping the buddy on the home screen plays a trick; new tricks unlock as sounds become secure.
+- **Progress the child sees is growth, not a percentage**: Home shows "I can read" counts (words, sounds, heart words) that only go up, and the journey map: the islands as a winding path, the travelled stretch drawn solid, the buddy standing on the current island. There is deliberately no whole-game progress bar: it would barely move for months.
+- **Kind streak**: one missed day a week is covered by a shield 🛡️, so a single sick day does not wipe out a long streak (or the 7- and 14-day rewards). Two missed days, or a second miss within the week, start a new streak.
+- **Daily reminder** (Android app): parents can turn on a notification at a time they pick (Parents → Settings → Daily reminder). It is per device and is skipped on days when every child on that device has already reached the daily goal. Reminders are scheduled two weeks ahead and refreshed whenever the app is opened.
 
 ## Quick start (web)
 
@@ -171,7 +174,7 @@ Home → **Parents** (gated by a multiplication question).
 - **Activity**: minutes per day for the last 14 days against the daily goal, and a table of recent sessions (duration, accuracy, new items, stopped early).
 - **Sounds**: the sound map (every grapheme coloured by mastery), heart words, and "trouble spots" (sounds with a high error rate).
 - **Account**: sign in / create account / restore from cloud / sign out.
-- **Settings** (for the child shown): name, daily goal, sound effects, female or male voice, voice speed, record sounds, start over, remove.
+- **Settings** (for the child shown): name, daily goal, sound effects, female or male voice, voice speed, record sounds, start over, remove; plus this device's daily reminder.
 
 ## Project layout
 

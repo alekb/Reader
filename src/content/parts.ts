@@ -189,23 +189,42 @@ export function unlockDescription(u: Unlock): string {
 }
 
 // ---------------------------------------------------------------- levels
-/** Stars needed for each level (level 1 at 0). */
-export const LEVEL_XP = [0, 100, 300, 700, 1500]
-export const MAX_LEVEL = LEVEL_XP.length
-export const LEVEL_NAMES = ['Hatchling', 'Sparky', 'Grown', 'Charged', 'Legendary']
+/** The buddy's look grows up to this level; later levels bring a new title. */
+export const BUDDY_MAX_LEVEL = 5
+const LEVEL_NAMES = ['Hatchling', 'Sparky', 'Grown', 'Charged', 'Legendary', 'Super', 'Mega', 'Ultra', 'Cosmic', 'Galactic']
 
-export function levelFor(xp: number): number {
-  let lvl = 1
-  for (let i = 1; i < LEVEL_XP.length; i++) if (xp >= LEVEL_XP[i]) lvl = i + 1
-  return lvl
+/** Stars from level n-1 to level n: 100, 150, 200 … growing gently, then 400 a level for ever. */
+function levelStep(n: number): number {
+  return Math.min(100 + 50 * (n - 2), 400)
 }
 
-/** Progress towards the next level, 0..1 (1 at max level). */
-export function levelProgress(xp: number): { level: number; next: number | null; fraction: number } {
+/** Stars needed to reach a level (level 1 at 0). */
+export function levelXp(level: number): number {
+  let xp = 0
+  for (let n = 2; n <= level; n++) xp += levelStep(n)
+  return xp
+}
+
+export function levelFor(xp: number): number {
+  let level = 1
+  let need = levelStep(2)
+  while (xp >= need) {
+    level++
+    need += levelStep(level + 1)
+  }
+  return level
+}
+
+/** "Legendary", then "Super" … "Galactic", "Galactic 2", "Galactic 3" … */
+export function levelName(level: number): string {
+  return level <= LEVEL_NAMES.length ? LEVEL_NAMES[level - 1] : `${LEVEL_NAMES[LEVEL_NAMES.length - 1]} ${level - LEVEL_NAMES.length + 1}`
+}
+
+/** Progress towards the next level, 0..1. There is always a next level. */
+export function levelProgress(xp: number): { level: number; next: number; fraction: number } {
   const level = levelFor(xp)
-  if (level >= MAX_LEVEL) return { level, next: null, fraction: 1 }
-  const lo = LEVEL_XP[level - 1]
-  const hi = LEVEL_XP[level]
+  const lo = levelXp(level)
+  const hi = levelXp(level + 1)
   return { level, next: hi, fraction: Math.max(0, Math.min(1, (xp - lo) / (hi - lo))) }
 }
 
