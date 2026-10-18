@@ -62,7 +62,7 @@ const { WORDS } = wordsMod
 const { TRICKY_WORDS } = trickyMod
 const { SENTENCES } = sentencesMod
 const { CHARACTERS } = charsMod
-const { PARTS, PAINTS, TRICKS, LEVEL_NAMES } = partsMod
+const { PARTS, PAINTS, TRICKS, levelName } = partsMod
 const { STICKERS } = stickersMod
 
 /** American English IPA for each GPC, and how to synthesize it. */
@@ -116,7 +116,7 @@ function collectPhrases() {
   for (const p of PAINTS) set.add(p.name)
   for (const t of TRICKS) set.add(t.line)
   for (const st of STICKERS) set.add(`A ${st.name} sticker!`)
-  for (let i = 0; i < LEVEL_NAMES.length; i++) set.add(`Level ${i + 1}, ${LEVEL_NAMES[i]}!`)
+  for (let n = 2; n <= 30; n++) set.add(`Level ${n}, ${levelName(n)}!`)
   for (const p of ['Level up!', 'You unlocked something new!', 'A surprise egg! Tap it to hatch it.']) set.add(p)
   for (const g of GPCS) set.add(`like ${g.keyword}.`)
   for (const g of GPCS) set.add(`like ${g.keyword}`)

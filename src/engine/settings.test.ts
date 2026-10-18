@@ -26,4 +26,14 @@ describe('settings', () => {
       expect(merged.xp).toBe(50)
     }
   })
+
+  it('a shield used on either device stays used after merging', () => {
+    const phone: Progress = { ...createProgress('Leo', 'robot', 1), updatedAt: 1000, streak: { count: 5, lastDay: '2026-01-10', shieldDay: '2026-01-09' } }
+    const tablet: Progress = { ...createProgress('Leo', 'robot', 1), updatedAt: 5000, streak: { count: 2, lastDay: '2026-01-10' } }
+    for (const merged of [mergeProgress(phone, tablet)!, mergeProgress(tablet, phone)!]) {
+      expect(merged.streak).toEqual({ count: 5, lastDay: '2026-01-10', shieldDay: '2026-01-09' })
+    }
+    const plain = mergeProgress(tablet, { ...tablet, updatedAt: 1 })!
+    expect('shieldDay' in plain.streak).toBe(false)
+  })
 })

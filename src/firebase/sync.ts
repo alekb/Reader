@@ -39,7 +39,10 @@ export function mergeProgress(localIn: Progress | null, remoteIn: Progress | nul
   if (!local) return remote
   if (!remote) return local
   const base = remote.updatedAt > local.updatedAt ? remote : local
-  const streak = remote.streak.lastDay > local.streak.lastDay ? remote.streak : local.streak.lastDay > remote.streak.lastDay ? local.streak : (remote.streak.count > local.streak.count ? remote.streak : local.streak)
+  const pick = remote.streak.lastDay > local.streak.lastDay ? remote.streak : local.streak.lastDay > remote.streak.lastDay ? local.streak : (remote.streak.count > local.streak.count ? remote.streak : local.streak)
+  // A shield used on either device counts as used (never write undefined: Firestore rejects it).
+  const shieldDay = [local.streak.shieldDay, remote.streak.shieldDay].filter((d): d is string => Boolean(d)).sort().pop()
+  const streak = shieldDay ? { ...pick, shieldDay } : pick
   return {
     ...base,
     xp: Math.max(local.xp, remote.xp),

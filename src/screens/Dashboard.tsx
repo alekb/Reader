@@ -13,6 +13,7 @@ import { levelFor } from '../content/parts'
 import { MAX_CHILDREN, childList, useProgress } from '../store/progressStore'
 import { useSync } from '../store/syncStore'
 import { openDownload, useUpdate } from '../store/updateStore'
+import { useReminders } from '../store/reminderStore'
 import { isParentUnlocked } from './ParentGate'
 import { markPicked } from './WhoIsPlaying'
 import { say } from '../speech/phonics'
@@ -623,6 +624,40 @@ function Confirm({ label, busyLabel, warning, action }: { label: string; busyLab
   )
 }
 
+function ReminderCard() {
+  const { supported, settings, denied, setEnabled, setTime } = useReminders()
+  const time = `${String(settings.hour).padStart(2, '0')}:${String(settings.minute).padStart(2, '0')}`
+  return (
+    <Card title="Daily reminder">
+      {supported ? (
+        <>
+          <label className="flex items-center justify-between py-1">
+            <span>Remind on this device</span>
+            <input type="checkbox" checked={settings.enabled} onChange={(e) => void setEnabled(e.target.checked)} className="h-6 w-6" />
+          </label>
+          <label className="flex items-center justify-between py-1">
+            <span>Time</span>
+            <input
+              type="time"
+              value={time}
+              disabled={!settings.enabled}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(':').map(Number)
+                if (Number.isFinite(h) && Number.isFinite(m)) setTime(h, m)
+              }}
+              className="rounded-xl border-2 border-ink/20 px-2 py-1 text-base disabled:opacity-40"
+            />
+          </label>
+          <div className="text-sm text-ink/60">A notification at this time each day. It is skipped on days when every child on this device has already reached their daily goal.</div>
+          {denied && <div className="mt-1 text-sm font-bold text-rose-600">Notifications are turned off for Reader Quest. Allow them in the phone's Settings → Apps → Reader Quest → Notifications.</div>}
+        </>
+      ) : (
+        <div className="text-sm text-ink/60">Daily reminders work in the Android app.</div>
+      )}
+    </Card>
+  )
+}
+
 function SettingsTab() {
   const progress = useProgress((s) => s.progress)!
   const setChildName = useProgress((s) => s.setChildName)
@@ -690,6 +725,7 @@ function SettingsTab() {
           </div>
         )}
       </Card>
+      <ReminderCard />
       <AppCard />
       <Card title="Danger zone">
         <Confirm

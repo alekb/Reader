@@ -9,7 +9,7 @@ interface Props {
   base: CharacterBase
   /** What the buddy wears. Defaults to the classic look. */
   look?: Look
-  /** 1..5, grows the buddy itself. */
+  /** Grows the buddy itself up to level 5; higher levels look like level 5. */
   level?: number
   mood?: Mood
   size?: number

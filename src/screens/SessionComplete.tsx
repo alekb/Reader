@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { GPC_BY_ID, GROUPS } from '../content/gpcs'
-import { LEVEL_NAMES, PAINT_BY_ID, PART_BY_ID, levelFor } from '../content/parts'
+import { BUDDY_MAX_LEVEL, PAINT_BY_ID, PART_BY_ID, levelFor, levelName } from '../content/parts'
 import { STICKER_BY_ID } from '../content/stickers'
 import { Character } from '../components/Character'
 import { Confetti, Screen } from '../components/ui'
@@ -30,9 +30,10 @@ export function SessionComplete() {
       say(`Great work, ${name}! You earned ${summary?.log.xpEarned ?? 0} stars.`)
       if (summary?.levelUp) {
         say('Level up!')
-        say(`Level ${summary.levelUp}, ${LEVEL_NAMES[summary.levelUp - 1]}!`)
+        say(`Level ${summary.levelUp}, ${levelName(summary.levelUp)}!`)
       }
       if (summary?.unlockedPartIds.length) say('You unlocked something new!')
+      if (summary?.shieldUsed) say('Your shield saved your streak!')
       if (summary?.eggAvailable) say('A surprise egg! Tap it to hatch it.')
     }, 400)
     return () => clearTimeout(t)
@@ -72,9 +73,9 @@ export function SessionComplete() {
         <div className="w-full rounded-3xl bg-gradient-to-r from-amber-200 to-pink-200 p-4 text-center shadow animate-pop">
           <div className="text-sm font-bold uppercase text-ink/60">Level up!</div>
           <div className="text-3xl font-extrabold">
-            Level {summary.levelUp} · {LEVEL_NAMES[summary.levelUp - 1]}
+            Level {summary.levelUp} · {levelName(summary.levelUp)}
           </div>
-          <div className="font-bold text-ink/70">Your buddy grew!</div>
+          <div className="font-bold text-ink/70">{summary.levelUp <= BUDDY_MAX_LEVEL ? 'Your buddy grew!' : 'A new title for your buddy!'}</div>
         </div>
       )}
 
@@ -147,6 +148,7 @@ export function SessionComplete() {
           <div className="text-sm font-bold text-grape">Paint your hat or outfit in Looks</div>
         </button>
       )}
+      {summary.shieldUsed && <div className="rounded-2xl bg-sky-100 px-4 py-2 text-center font-extrabold text-sky-800">🛡️ Your shield saved your streak!</div>}
       <div className="text-lg font-bold text-ink/60">🔥 {progress.streak.count}-day streak</div>
       <button onClick={() => nav('/')} className="btn btn-primary mt-2 w-full">
         Done ✓

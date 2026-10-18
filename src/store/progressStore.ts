@@ -34,6 +34,8 @@ export interface SessionSummary {
   levelUp: number | null
   /** True when the daily surprise egg is waiting to be hatched. */
   eggAvailable: boolean
+  /** True when the weekly shield kept the streak going this session. */
+  shieldUsed?: boolean
 }
 
 export type { ChildRecord }
@@ -223,7 +225,8 @@ export const useProgress = create<ProgressState>()(
           completed,
           steps: Object.entries(active.steps).map(([kind, v]) => ({ kind, ...v })),
         }
-        const summary: SessionSummary = { log, unlockedPartIds: unlocked, completedGroups: newGroups, accuracy, levelUp: levelAfter > levelBefore ? levelAfter : null, eggAvailable }
+        const shieldUsed = next.streak.shieldDay !== progress.streak.shieldDay
+        const summary: SessionSummary = { log, unlockedPartIds: unlocked, completedGroups: newGroups, accuracy, levelUp: levelAfter > levelBefore ? levelAfter : null, eggAvailable, shieldUsed }
         // Keep the newest 400 sessions locally; the cloud keeps everything.
         const nextSessions = [...sessions, log].slice(-400)
         set({ progress: next, sessions: nextSessions, active: null, lastSummary: summary, dirty: get().dirty + 1 })
