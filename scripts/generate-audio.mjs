@@ -17,6 +17,8 @@
  *     appear, looped the same way,
  *   - stops (t p k d g b) keep only the burst plus a few ms, so "t" not "tuh",
  *   - vowels are synthesized directly from IPA.
+ * Held voiced sounds (m n ng l r y w v z) then get upper harmonics added where they
+ * need them, so they are audible on tablet speakers (scripts/small-speakers.mjs).
  * Output: public/audio[/male]/{sounds,letters,words,phrases}/*.mp3 + manifest.json.
  */
 import fs from 'node:fs'
@@ -24,6 +26,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { createServer } from 'vite'
+import { boostForSmallSpeakers } from './small-speakers.mjs'
 
 const KEY = process.env.GOOGLE_TTS_API_KEY
 if (!KEY) {
@@ -386,6 +389,12 @@ async function makeSound(gpc) {
   return finish(loopTo(part, voicedFric ? 400 : 450), 15, 40)
 }
 
+/**
+ * Voiced sounds you can hold. Cut from a syllable, these can be little more than a tone at
+ * the voice's pitch, which tablet and phone speakers barely play: see small-speakers.mjs.
+ */
+const HUMS = new Set(['m', 'n', 'ŋ', 'l', 'ɹ', 'j', 'w', 'v', 'z'])
+
 function finish(pcm, fadeIn, fadeOut) {
   return concat(silence(30), fade(normalize(pcm), fadeIn, fadeOut), silence(60))
 }
@@ -410,7 +419,7 @@ if (want('sounds')) {
   for (const g of GPCS) {
     const file = `sounds/${g.id}.mp3`
     manifest.sounds[g.id] = file
-    jobs.push({ kind: 'sounds', key: g.id, file, run: async () => makeSound(g) })
+    jobs.push({ kind: 'sounds', key: g.id, file, run: async () => (HUMS.has(IPA[g.id][0]) ? boostForSmallSpeakers(await makeSound(g), SR) : makeSound(g)) })
   }
 }
 if (want('letters')) {
