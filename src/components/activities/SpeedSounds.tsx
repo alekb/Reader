@@ -6,7 +6,7 @@ import type { ReviewItem } from '../../engine/lessonBuilder'
 import { say, speakSound, speakWord } from '../../speech/phonics'
 import { Mascot, graphemeLabel } from '../ui'
 import { ChoiceQuiz, sample, shuffleArr } from './ChoiceQuiz'
-import { CONFUSABLE, makeQueue, requeue } from './common'
+import { makeQueue, pickSoundDistractors, requeue } from './common'
 import type { ActivityProps } from './common'
 
 interface Props extends ActivityProps {
@@ -26,12 +26,7 @@ export function SpeedSounds({ items, knownGpcIds, knownTricky, onResult, onDone 
   const question = useMemo(() => {
     if (!item) return null
     if (item.type === 'gpc') {
-      const target = GPC_BY_ID[item.id]
-      const pool = knownGpcIds.filter((id) => id !== item.id && GPC_BY_ID[id].grapheme !== target.grapheme)
-      const confusable = (CONFUSABLE[item.id] ?? []).filter((id) => pool.includes(id))
-      const picks = [...sample(confusable, 2), ...sample(pool, 3, (id) => confusable.includes(id))].slice(0, 3)
-      const fallback = Object.keys(GPC_BY_ID).filter((id) => id !== item.id && !picks.includes(id) && GPC_BY_ID[id].grapheme !== target.grapheme)
-      while (picks.length < 3) picks.push(fallback[Math.floor(Math.random() * fallback.length)])
+      const picks = pickSoundDistractors(item.id, knownGpcIds)
       const options = shuffleArr([item.id, ...picks]).map((id) => ({ id, label: <span className="font-letter">{graphemeLabel(id, GPC_BY_ID[id].grapheme)}</span> }))
       return {
         options,

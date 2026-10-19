@@ -5,7 +5,8 @@ import { say, speakSound, speakWord } from '../../speech/phonics'
 import { pause, stopSpeaking } from '../../speech/tts'
 import { sfx } from '../../speech/sfx'
 import { Mascot, graphemeLabel } from '../ui'
-import { sample, shuffleArr } from './ChoiceQuiz'
+import { shuffleArr } from './ChoiceQuiz'
+import { soundsAlike } from './common'
 import type { ActivityProps } from './common'
 
 interface Props extends ActivityProps {
@@ -28,8 +29,12 @@ export function BuildWord({ words, knownGpcIds, onResult, onDone }: Props) {
 
   const tiles: Tile[] = useMemo(() => {
     if (!word) return []
-    const distractorPool = knownGpcIds.filter((id) => !word.gpcs.includes(id) && GPC_BY_ID[id].grapheme.length <= 2)
-    const distractors = sample(distractorPool, 2)
+    // Spare tiles never sound like a sound in the word, or like each other.
+    const distractors: string[] = []
+    for (const id of shuffleArr(knownGpcIds)) {
+      if (distractors.length >= 2) break
+      if (GPC_BY_ID[id].grapheme.length <= 2 && [...word.gpcs, ...distractors].every((g) => !soundsAlike(g, id))) distractors.push(id)
+    }
     return shuffleArr([...word.gpcs, ...distractors]).map((gpcId, key) => ({ key, gpcId }))
   }, [word, knownGpcIds, attempt])
 

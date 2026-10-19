@@ -6,7 +6,7 @@ import { pause, stopSpeaking } from '../../speech/tts'
 import { sfx } from '../../speech/sfx'
 import { Mascot, graphemeLabel } from '../ui'
 import { ChoiceQuiz, sample, shuffleArr } from './ChoiceQuiz'
-import { CONFUSABLE } from './common'
+import { pickSoundDistractors } from './common'
 import type { ActivityProps } from './common'
 import { LetterTrace } from './LetterTrace'
 
@@ -57,17 +57,9 @@ export function NewSound({ gpcId, knownGpcIds, onIntroduced, onResult, onDone }:
 
   // ---- find rounds ----
   const findQuestion = useMemo(() => {
-    const pool = knownGpcIds.filter((id) => id !== gpcId && GPC_BY_ID[id].grapheme !== gpc.grapheme)
-    const confusable = (CONFUSABLE[gpcId] ?? []).filter((id) => pool.includes(id))
-    const picks = [...sample(confusable, findRound === 0 ? 1 : 2), ...sample(pool, 3)].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3)
-    const singles = Object.keys(GPC_BY_ID).filter((id) => id !== gpcId && GPC_BY_ID[id].grapheme.length === 1 && !picks.includes(id))
-    const all = singles.length >= 3 ? singles : Object.keys(GPC_BY_ID).filter((id) => id !== gpcId && GPC_BY_ID[id].grapheme !== gpc.grapheme)
-    while (picks.length < 3) {
-      const c = all[Math.floor(Math.random() * all.length)]
-      if (!picks.includes(c)) picks.push(c)
-    }
+    const picks = pickSoundDistractors(gpcId, knownGpcIds, findRound === 0 ? 1 : 2)
     return shuffleArr([gpcId, ...picks]).map((id) => ({ id, label: <span className="font-letter">{graphemeLabel(id, GPC_BY_ID[id].grapheme)}</span> }))
-  }, [findRound, gpcId, knownGpcIds, gpc.grapheme])
+  }, [findRound, gpcId, knownGpcIds])
 
   // ---- find in word ----
   const wordQuestion = useMemo(() => {
