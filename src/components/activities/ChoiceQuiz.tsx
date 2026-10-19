@@ -136,17 +136,4 @@ export function ChoiceQuiz({ prompt, options, correctId, onAnswer, onDone, corre
   )
 }
 
-/** Shuffle helper for options. */
-export function shuffleArr<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
-/** Pick n random distinct items from pool (excluding `exclude`). */
-export function sample<T>(pool: T[], n: number, exclude: (x: T) => boolean = () => false): T[] {
-  return shuffleArr(pool.filter((x) => !exclude(x))).slice(0, n)
-}
+export { sample, shuffleArr } from './common'
